@@ -203,7 +203,7 @@ class DZOS:
         append_data(print_data_filepath, print_data)
 
         gcmd.respond_info("DZOS: Z Offset: %.3f" % z_offset)
-        self._display_msg(f"DZOS: {z_offset:.3f}")
+        self._display_msg(f"DZOS: Z {z_offset:.3f}")
         
         self._set_z_offset(z_offset + self.probe_offset_z)
 
@@ -229,10 +229,10 @@ class DZOS:
             margin_print_max = [x + margin for x in print_max]
 
             print_max_center_size = max(abs(175 - margin_print_max[0]), abs(175 - margin_print_min[0]), abs(175 - margin_print_max[1]), abs(175 - margin_print_min[1]))
-            gcmd.respond_info("Print Max Center Offset: %.2fmm" % print_max_center_size)
+            gcmd.respond_info("DZOS: Center Offset: %.2fmm" % print_max_center_size)
             duration = max(int(print_max_center_size / 0.087) - 200, 0)
-        gcmd.respond_info("Calculated Soak Time: %is" % duration)
-        iteration = 0  
+        gcmd.respond_info("DZOS: Calculated Soak Time: %is" % duration)
+        iteration = 0
         while iteration < duration:
             self._display_msg(f"DZOS: Soak-{int(duration - iteration)}s")
             self.toolhead.dwell(1)
