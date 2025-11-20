@@ -61,13 +61,8 @@ Nun hast du das komplette Repository lokal und kannst mit den Dateien arbeiten.
     - **J:** Einrichtung abgeschlossen. Der Drucker startet neu.
 
 ## VERWENDUNG:
-1. Die Wärmeeinwirkzeit vor dem Druck in der Web-Oberfläche mit `DZOS SOAK TIME` einstellen.
-    - **RICHTWERTE:** Werte für einen kalten Drucker, spätere Drucke benötigen 0 Sekunden.
-    - **KLEIN:** 0
-    - **MITTEL/GROß:** 500–1000
-    - **GESAMTES BETT:** ~1500
-2. Druck wie gewohnt starten. Der Z-Versatz wird automatisch pro Druck berechnet.
-3. Viel Erfolg beim Drucken!
+1. Druck wie gewohnt starten. Der Z-Versatz wird automatisch pro Druck berechnet.
+2. Viel Erfolg beim Drucken!
 
 ## DEAKTIVIEREN / REAKTIVIEREN:
 1. `DZOS Disable`-Makro deaktiviert DZOS – keine weiteren Änderungen nötig.

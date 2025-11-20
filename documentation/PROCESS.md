@@ -48,13 +48,8 @@
     - **J:** Setup is finished. Printer will reboot.
 
 ## USAGE:
-1. Use the web interface to define heat soak time before your print with `DZOS SOAK TIME`.
-    - **GUIDELINES:** The estimates below or for a cold printer. Subsequent prints require 0 seconds.
-    - **SMALL:**  0
-    - **MEDIUM/LARGE:** 500-1000
-    - **WHOLE BED:** ~1500
-2. Print as normal. The Z offset will calculate per print.
-3. Happy testing!
+1. Print as normal. The Z offset and soak time will calculate per print.
+2. Happy testing!
 
 ## DISABLE/RE-ENABLE:
 1. `DZOS Disable` macro will stop the code from running. No other changes required.
