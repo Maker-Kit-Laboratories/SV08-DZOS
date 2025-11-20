@@ -1,8 +1,8 @@
 ######################################################################################################################################################################################################
 # DZOS: DYNAMIC Z OFFSET AND SOAK
 # AUTHOR: TRANSFORM
-# DATE: 2025-01-18
-# VERSION: 0.1.45
+# DATE: 2025-11-19
+# VERSION: 0.2.00
 ######################################################################################################################################################################################################
 import json
 import os
@@ -48,8 +48,8 @@ class DZOS:
     def cmd_DZOS_Z_OFFSET(self, gcmd):
         self._init_printer_objects()
         cache_static = int(gcmd.get("CACHE_STATIC", 0))
-        soak_time = int(gcmd.get("SOAK_TIME", 0))
-        calibration_temp = int(gcmd.get("TEMP", 0))        
+        calibration_temp = int(gcmd.get("TEMP", 0))
+        force_soak_time = int(gcmd.get("FORCE_SOAK_TIME", 0))      
         enable = int(gcmd.get("ENABLE", -1))
         test_name = gcmd.get("TEST", None)
         if enable == 1:
@@ -70,15 +70,15 @@ class DZOS:
             self._cache_static(gcmd)
             return
         if calibration_temp > 0:
-            self._set_temperature(calibration_temp, blocking=True)        
+            self._set_temperature(calibration_temp, blocking=True)      
         if test_name:
-            self._calculate_static_test(gcmd, test_name, soak_time)
+            self._calculate_static_test(gcmd, test_name, force_soak_time)
             return            
         if not os.path.exists(static_filepath) or self.pressure_xy == [0,0] or self.dzos_calculated == 0:
             gcmd.respond_info("DZOS: No Static Data Found!")
             self._display_msg("DZOS: No Static!")
             return
-        self._calculate_dynamic_offset(gcmd, soak_time)
+        self._calculate_dynamic_offset(gcmd, force_soak_time)
 
 
     def cmd_DZOS_Z_CALCULATE(self, gcmd):
@@ -96,7 +96,6 @@ class DZOS:
         self.global_configfile.set(self.config_name, "calculated", 1)
         gcmd.respond_info("DZOS: Stored..")
         self._display_msg("DZOS: Stored..")
-
 
 
     def cmd_DZOS_Z_CAPTURE(self, gcmd):
@@ -133,8 +132,8 @@ class DZOS:
         self._static_adjustment_factor = static_data["adjustment_factor"]
 
 
-    def _calculate_static_test(self, gcmd, test_name, soak_time):
-        self._heat_soak(duration=soak_time)
+    def _calculate_static_test(self, gcmd, test_name, force_soak_time):
+        self._heat_soak(gcmd, force_soak_time)
         self._display_msg("DZOS: Level..")
         gcmd.respond_info(f"DZOS: Level..")      
         self._execute_hop_z(self.hop_z)
@@ -142,15 +141,16 @@ class DZOS:
         self._quad_gantry_level()
         self._display_msg("DZOS: Test..")
         gcmd.respond_info(f"DZOS: Static Test..")
+        
+        d_pressure_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
+        d_pressure_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
+        d_pressure_z = (d_pressure_z_s1 + d_pressure_z_s2) / 2
+        self._set_z_zero(d_pressure_z)        
+        
         d_bed_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
         d_bed_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
         d_bed_z = (d_bed_z_s1 + d_bed_z_s2) / 2
         self._set_z_zero(d_bed_z)
-
-        d_pressure_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
-        d_pressure_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
-        d_pressure_z = (d_pressure_z_s1 + d_pressure_z_s2) / 2
-        self._set_z_zero(d_pressure_z)
 
         static_data = read_data(static_filepath)
         static_b_pressure_z = static_data["b_pressure_z"]
@@ -159,26 +159,23 @@ class DZOS:
         offset_pressure = (d_pressure_z - static_b_pressure_z)
         static_data[f"offset_pressure_{test_name.lower()}"] = offset_pressure
         write_data(static_filepath, static_data)
-        safe_z_offset = static_e_pressure_nozzle + (0.5 * static_b_pressure_z)
-        self._set_z_offset(safe_z_offset + self.probe_offset_z)
+        if test_name.lower() == "rt":
+            safe_z_offset = static_e_pressure_nozzle + (0.5 * static_b_pressure_z)
+            self._set_z_offset(safe_z_offset + self.probe_offset_z)
 
 
-    def _cache_static(self, gcmd):
-        initial_zero_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
-        initial_zero_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
-        initial_zero = (initial_zero_s1 + initial_zero_s2) / 2
-        self._set_z_zero(initial_zero)
-        
+    def _cache_static(self, gcmd):        
+        b_pressure_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
+        b_pressure_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
+        b_pressure_z = (b_pressure_z_s1 + b_pressure_z_s2) / 2
+        self._set_z_zero(b_pressure_z)
+
         e_pressure_nozzle = self._generic_z_probe(gcmd, self.probe_pressure_object, x=self.pressure_nozzle_xy[0], y=self.pressure_nozzle_xy[1])
         e_bed_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
         e_bed_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
         e_bed_z = (e_bed_z_s1 + e_bed_z_s2) / 2
         self._set_z_zero(e_bed_z)
 
-        b_pressure_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
-        b_pressure_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
-        b_pressure_z = (b_pressure_z_s1 + b_pressure_z_s2) / 2
-        self._set_z_zero(b_pressure_z)
         data_dict = {
             "b_pressure_z": b_pressure_z,       
             "e_bed_z": e_bed_z,
@@ -187,22 +184,22 @@ class DZOS:
         write_data(static_filepath, data_dict)
 
 
-    def _calculate_dynamic_offset(self, gcmd, soak_time):
-        self._heat_soak(duration=soak_time)
+    def _calculate_dynamic_offset(self, gcmd, force_soak_time):
+        duration = self._heat_soak(gcmd, force_soak_time)
         self._display_msg("DZOS: Calc..")
-        
-        d_bed_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
-        d_bed_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
-        d_bed_z = (d_bed_z_s1 + d_bed_z_s2) / 2
-        self._set_z_zero(d_bed_z)
 
         d_pressure_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
         d_pressure_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
         d_pressure_z = (d_pressure_z_s1 + d_pressure_z_s2) / 2
         self._set_z_zero(d_pressure_z)
+
+        d_bed_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
+        d_bed_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
+        d_bed_z = (d_bed_z_s1 + d_bed_z_s2) / 2
+        self._set_z_zero(d_bed_z)
             
-        z_offset = self._calculate_z_offset(d_pressure_z)
-        print_data = self._create_data_dict(d_bed_z, d_pressure_z, -z_offset)
+        z_offset = self._calculate_z_offset(d_bed_z)
+        print_data = self._create_data_dict(d_pressure_z, d_bed_z, -z_offset)
         append_data(print_data_filepath, print_data)
 
         gcmd.respond_info("DZOS: Z Offset: %.3f" % z_offset)
@@ -211,12 +208,36 @@ class DZOS:
         self._set_z_offset(z_offset + self.probe_offset_z)
 
 
-    def _heat_soak(self, duration):
-        iteration = 0
+    def _heat_soak(self, gcmd, force_soak_time=0):
+        if force_soak_time > 0:
+            duration = force_soak_time
+        else:
+            exclude_objects = self.printer.lookup_object("exclude_object", None)
+            objects = exclude_objects.get_status().get("objects", [])
+            margin = 2.0
+            list_of_xs = []
+            list_of_ys = []
+            gcmd.respond_info("Found %s objects." % (len(objects)))
+            for obj in objects:
+                for point in obj["polygon"]:
+                    list_of_xs.append(point[0])
+                    list_of_ys.append(point[1])
+
+            print_min = [min(list_of_xs), min(list_of_ys)]
+            print_max = [max(list_of_xs), max(list_of_ys)]
+            margin_print_min = [x - margin for x in print_min]
+            margin_print_max = [x + margin for x in print_max]
+
+            print_max_center_size = max(abs(175 - margin_print_max[0]), abs(175 - margin_print_min[0]), abs(175 - margin_print_max[1]), abs(175 - margin_print_min[1]))
+            gcmd.respond_info("Print Max Center Offset: %.2fmm" % print_max_center_size)
+            duration = max(int(print_max_center_size / 0.087) - 200, 0)
+        gcmd.respond_info("Calculated Soak Time: %is" % duration)
+        iteration = 0  
         while iteration < duration:
             self._display_msg(f"DZOS: Soak-{int(duration - iteration)}s")
             self.toolhead.dwell(1)
             iteration += 1
+        return duration
 
 
     def _display_msg(self, msg):
@@ -224,15 +245,14 @@ class DZOS:
         self.display_status_object.cmd_M117(gcmd)
 
 
-    def _calculate_z_offset(self, d_pressure_z):
+    def _calculate_z_offset(self, d_bed_z):
         self._init_static_data()
-        offset_pressure = (d_pressure_z - self.static_b_pressure_z)
+        offset_pressure = (self.static_e_bed_z - d_bed_z)
         target_z_offset = (self.static_offset_factor * offset_pressure) + self._static_adjustment_factor
         return -target_z_offset
 
 
     def _generic_z_probe(self, gcmd, probe_object, x, y, hop=True):
-        version = str(self.printer.start_args['software_version'])
         try:
             return self._latest_z_probe(gcmd, probe_object, x, y, hop)
         except:
@@ -257,21 +277,26 @@ class DZOS:
         probe_session.end_probe_session()
         return probe_z
 
+
     def _set_z_zero(self, z):
         current = list(self.toolhead.get_position())
         current[2] = current[2] - z
         self.toolhead.set_position(current)
 
+
     def _execute_hop_z(self, z):
         self.toolhead.manual_move([None, None, z], self.speed_z_hop)
+
 
     def _set_z_offset(self, offset):
         gcmd_offset = self.gcode.create_gcode_command("SET_GCODE_OFFSET", "SET_GCODE_OFFSET", {'Z': offset})
         self.gcode_move.cmd_SET_GCODE_OFFSET(gcmd_offset)
 
+
     def _save_z_offset(self):
         gcmd_probe_save = self.gcode.create_gcode_command("Z_OFFSET_APPLY_PROBE", "", {})
         self.printer.lookup_object('probe').cmd_Z_OFFSET_APPLY_PROBE(gcmd_probe_save)
+
 
     def _create_data_dict(self, d_bed_z, d_pressure_z, z_offset=None):
         self._init_static_data()
@@ -285,6 +310,7 @@ class DZOS:
         if z_offset:
             data_dict["d_offset_z"] = z_offset
         return data_dict
+
 
     def _set_temperature(self, temperature, blocking=False):
         gcode_string = "M140"
@@ -302,10 +328,12 @@ class DZOS:
         else:
             self.heater_bed.cmd_M140(gcmd_heater_set)
 
+
     def _quad_gantry_level(self):
         gcmd_qgl = self.gcode.create_gcode_command("QUAD_GANTRY_LEVEL", "QUAD_GANTRY_LEVEL", {})
         qgl = self.printer.lookup_object('quad_gantry_level')
         qgl.cmd_QUAD_GANTRY_LEVEL(gcmd_qgl)
+
 
     def _home(self, axes="Z"):
         gcmd_home = self.gcode.create_gcode_command("G28", "G28", {axes: None})
@@ -388,7 +416,6 @@ def optimize_factors(pressure_offset_rt, presure_offset_at, z_offset_rt, z_offse
     return offset_factor, adjustment_factor
 
 
-
 def calculate_error(factors, dataset):
     offset_factor, adjustment_factor = factors
     offset_pressure = dataset[:, 0]
@@ -397,7 +424,6 @@ def calculate_error(factors, dataset):
     predicted_z_offset = calculate_target(offset_factor, offset_pressure, adjustment_factor)
     errors = (predicted_z_offset - target_z_offset) ** 2
     return np.mean(errors)
-
 
 
 def calculate_target(offset_factor, offset_pressure, adjustment_factor):

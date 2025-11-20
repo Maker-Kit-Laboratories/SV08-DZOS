@@ -3,7 +3,7 @@
 
 # DZOS: Dynamic Z Offset and Soaking
 
-**Latest: 0.1.45**
+**Latest: 0.2.00**
 
 ## GOAL:
 1. Solve the SV08 bed and Z issues.
@@ -13,7 +13,7 @@
 ## DISCLAIMER:
 1. This is an early script, use your best judgment if it's right for you.
 2. Supports stock SV08 klipper and SV08 mainline.
-3. No dynamic soaking in latest. Custom macro available to define heat soak time before print.
+3. Currently automatic soaking is working but early.
 
 ## DOCUMENTATION:
    [Documentation -->](./documentation/PROCESS.md)

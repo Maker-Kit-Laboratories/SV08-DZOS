@@ -56,7 +56,7 @@ Nun hast du das komplette Repository lokal und kannst mit den Dateien arbeiten.
     - **E:** `BEEP - NUTZEREINGABE ERFORDERLICH - BEEP`: Während des Drucks den Z-Versatz manuell nachjustieren.
     - **F:** Automatische Speicherung des eingestellten Z-Versatzes.
     - **G:** `BEEP - NUTZEREINGABE ERFORDERLICH - BEEP`: Gedrucktes Teil entfernen (sofort oder später).
-    - **H:** 1000 Sekunden Wärme-Soaking bei 65 °C.
+    - **H:** 1500 Sekunden Wärme-Soaking bei 90 °C.
     - **I:** Wiederholung von C → F.
     - **J:** Einrichtung abgeschlossen. Der Drucker startet neu.
 

@@ -43,7 +43,7 @@
     - **E:** `BEEP - USER INTERACTION - BEEP:` Adjust z offset to your desired z offset as the print prints.
     - **F:** Automatic capture of user input z offset.
     - **G:** `BEEP - USER INTERACTION - BEEP:` Clean finished print either immediately or during the next step.
-    - **H:** 1000 second heat soak at 65C.
+    - **H:** 1500 second heat soak at 90C.
     - **I:** Repeat of C -> F.
     - **J:** Setup is finished. Printer will reboot.
 
