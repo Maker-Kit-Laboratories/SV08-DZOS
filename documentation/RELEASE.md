@@ -4,6 +4,9 @@
 ## RELEASE NOTES:
 - Updates do not invalidate recorded setups or data.
 
+### 0.2.01
+- Bug fixed.
+
 ### 0.2.00
 - Added automatic dynamic soaking.
 - Added plate offsets.

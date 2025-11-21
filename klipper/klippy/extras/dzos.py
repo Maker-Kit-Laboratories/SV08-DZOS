@@ -134,24 +134,25 @@ class DZOS:
 
     def _calculate_static_test(self, gcmd, test_name, force_soak_time):
         self._heat_soak(gcmd, force_soak_time)
-        self._display_msg("DZOS: Level..")
-        gcmd.respond_info(f"DZOS: Level..")      
-        self._execute_hop_z(self.hop_z)
-        self._home(axes="Z")
-        self._quad_gantry_level()
         self._display_msg("DZOS: Test..")
         gcmd.respond_info(f"DZOS: Static Test..")
-        
+
+        initial_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
+        initial_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
+        initial_z = (initial_z_s1 + initial_z_s2) / 2
+        self._set_z_zero(initial_z)   
+
         d_pressure_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
         d_pressure_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
         d_pressure_z = (d_pressure_z_s1 + d_pressure_z_s2) / 2
-        self._set_z_zero(d_pressure_z)        
-        
+        self._set_z_zero(d_pressure_z)
+
         d_bed_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
         d_bed_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
         d_bed_z = (d_bed_z_s1 + d_bed_z_s2) / 2
         self._set_z_zero(d_bed_z)
 
+        
         static_data = read_data(static_filepath)
         static_b_pressure_z = static_data["b_pressure_z"]
         static_e_pressure_nozzle = static_data["e_pressure_nozzle_z"]
@@ -159,9 +160,9 @@ class DZOS:
         offset_pressure = (d_pressure_z - static_b_pressure_z)
         static_data[f"offset_pressure_{test_name.lower()}"] = offset_pressure
         write_data(static_filepath, static_data)
-        if test_name.lower() == "rt":
-            safe_z_offset = static_e_pressure_nozzle + (0.5 * static_b_pressure_z)
-            self._set_z_offset(safe_z_offset + self.probe_offset_z)
+
+        safe_z_offset = static_e_pressure_nozzle + (0.5 * static_b_pressure_z)
+        self._set_z_offset(safe_z_offset + self.probe_offset_z)
 
 
     def _cache_static(self, gcmd):        
@@ -188,18 +189,23 @@ class DZOS:
         duration = self._heat_soak(gcmd, force_soak_time)
         self._display_msg("DZOS: Calc..")
 
+        intial_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
+        intial_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
+        initial_z = (intial_z_s1 + intial_z_s2) / 2
+        self._set_z_zero(initial_z)
+
         d_pressure_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
         d_pressure_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
         d_pressure_z = (d_pressure_z_s1 + d_pressure_z_s2) / 2
         self._set_z_zero(d_pressure_z)
-
+        
         d_bed_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
         d_bed_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
         d_bed_z = (d_bed_z_s1 + d_bed_z_s2) / 2
         self._set_z_zero(d_bed_z)
             
-        z_offset = self._calculate_z_offset(d_bed_z)
-        print_data = self._create_data_dict(d_pressure_z, d_bed_z, -z_offset)
+        z_offset = self._calculate_z_offset(d_pressure_z)
+        print_data = self._create_data_dict(d_bed_z, d_pressure_z, -z_offset)
         append_data(print_data_filepath, print_data)
 
         gcmd.respond_info("DZOS: Z Offset: %.3f" % z_offset)
@@ -245,9 +251,9 @@ class DZOS:
         self.display_status_object.cmd_M117(gcmd)
 
 
-    def _calculate_z_offset(self, d_bed_z):
+    def _calculate_z_offset(self, d_pressure_z):
         self._init_static_data()
-        offset_pressure = (self.static_e_bed_z - d_bed_z)
+        offset_pressure = (d_pressure_z - self.static_b_pressure_z)
         target_z_offset = (self.static_offset_factor * offset_pressure) + self._static_adjustment_factor
         return -target_z_offset
 
