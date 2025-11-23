@@ -8,7 +8,10 @@
 2. File transfer software (examples below):
     - [FileZilla](https://filezilla-project.org/)
     - [winSCP](https://winscp.net/)
-3. Configure your slicer to pass `TEMP=<TEMP FROM SLICER>` to `START_PRINT`
+3. Slicer Config: 
+    - Configure your slicer to pass `NOZZLETEMP=<###>` `BEDTEMP=<##>` to `START_PRINT`.
+    - Configure your slicer to pass `DZOS_END_PRINT` after your existing `END_PRINT`.
+4. Ensure your hotend/nozzle is tight! Loose components move more during heat change.
 
 ## INSTALL:
 1. Access the SV08 filesystem. (`user: sovol` - `password: sovol`)
@@ -22,7 +25,7 @@
 1. The `dzos.cfg` overrides your `START_PRINT`. This is default but optional.
 2. If you want to adjust your own `START_PRINT` read the following: 
     - Make sure you're using the base adaptive bed mesh.
-    - Add the DZOS call: `_DZOS_PRINT TEMP=<INPUT TEMP>` just before: `BED_MESH_CALIBRATE_BASE ADAPTIVE=1`. 
+    - Add the DZOS call: `_DZOS_PRINT NOZZLETEMP=<###> BEDTEMP=<##>` just before: `BED_MESH_CALIBRATE_BASE ADAPTIVE=1`. 
     - Ensure you slicer is passing the temperature to your `START_PRINT`.
     - Remove the included `START_PRINT` from the provided `dzos.cfg` macro.
 
@@ -43,12 +46,12 @@
     - **E:** `BEEP - USER INTERACTION - BEEP:` Adjust z offset to your desired z offset as the print prints.
     - **F:** Automatic capture of user input z offset.
     - **G:** `BEEP - USER INTERACTION - BEEP:` Clean finished print either immediately or during the next step.
-    - **H:** 1500 second heat soak at 90C.
+    - **H:** 1000 second heat soak at 65C.
     - **I:** Repeat of C -> F.
     - **J:** Setup is finished. Printer will reboot.
 
 ## USAGE:
-1. Print as normal. The Z offset and soak time will calculate per print.
+1. Print as normal. The Z offset and soak time will calculate per print. Any adjustments made will help DZOS learn.
 2. Happy testing!
 
 ## DISABLE/RE-ENABLE:

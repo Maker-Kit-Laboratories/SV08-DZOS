@@ -3,17 +3,17 @@
 
 # DZOS: Dynamic Z Offset and Soaking
 
-**Latest: 0.2.01**
+**Latest: 0.2.05**
 
 ## GOAL:
 1. Solve the SV08 bed and Z issues.
 2. Dynamic Z offset based on current state of bed.
-3. Dynamic pre-print soak time based on realtime bed sampling and size/duration of initial X layers.
+3. Dynamic pre-print soak time based on realtime size of print.
 
 ## DISCLAIMER:
-1. This is an early script, use your best judgment if it's right for you.
+1. This is a klipper script, use your best judgment if it's right for you.
 2. Supports stock SV08 klipper and SV08 mainline.
-3. Currently automatic soaking is working.
+
 
 ## DOCUMENTATION:
    [Documentation -->](./documentation/PROCESS.md)

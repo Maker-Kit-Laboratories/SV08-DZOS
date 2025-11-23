@@ -1,8 +1,10 @@
 
 # DZOS: Dynamic Z Offset and Soaking
 
-## RELEASE NOTES:
-- Updates do not invalidate recorded setups or data.
+### 0.2.05
+- WARNING: INIT MUST BE RE-RUN.
+- Changed calculation method and parameters.
+- Added machine learning. Printer will learn from manual adjustments.
 
 ### 0.2.01
 - Bug fixed.
