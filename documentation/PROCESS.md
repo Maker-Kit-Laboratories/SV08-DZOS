@@ -5,21 +5,18 @@
 
 ## PRE-REQUISITES:
 1. SV08 3D Printer with an inductive sensor.
-2. File transfer software (examples below):
-    - [FileZilla](https://filezilla-project.org/)
-    - [winSCP](https://winscp.net/)
+2. Terminal / Powershell
 3. Slicer Config: 
     - Configure your slicer to pass `NOZZLETEMP=<###>` `BEDTEMP=<##>` to `START_PRINT`.
     - Configure your slicer to pass `DZOS_END_PRINT` after your existing `END_PRINT`.
 4. Ensure your hotend/nozzle is tight! Loose components move more during heat change.
 
 ## INSTALL:
-1. Access the SV08 filesystem. (`user: sovol` - `password: sovol`)
-2. Transfer folders to `/home/sovol/...`. Overwrite.
-3. Restart Klipper service or hard reboot printer.
-4. Edit `printer.cfg`:
-    - Add `[include dzos.cfg]` to your `printer.cfg` after other `[include]` lines.
-5. Save `printer.cfg` changes and restart.
+1. Access the SV08 via SSH. ( `ssh sovol@<your sv08 ip>` )
+2. `git clone https://github.com/Maker-Kit-Laboratories/SV08-DZOS.git`
+3. `cd SV08-DZOS`
+4. `chmod +x dzos_install.sh`
+5. `./dzos_install.sh`
 
 ## CONFIGURATION (OPTIONAL):
 1. The `dzos.cfg` overrides your `START_PRINT`. This is default but optional.
@@ -59,12 +56,11 @@
 2. `DZOS Enable` macro will re-enable usage. You do not have to re-run the setup.
 
 ## UNINSTALL:
-1. Remove `/home/sovol/printer_data/config/dzos.cfg`
-2. Remove `/home/sovol/printer_data/config/dzos_print_data.json`
-3. Remove `/home/sovol/printer_data/config/dzos_static_data.json`
-4. Remove `/home/sovol/printer_data/gcodes/dzos_test_*.gcode`
-5. Remove `/home/sovol/klipper/klippy/extras/dzos.py`
-6. Ensure your `printer.cfg`'s saved variables related to `[dzos]` are removed.
+1. Access the SV08 via SSH.
+2. `cd SV08-DZOS`
+3. `chmod +x dzos_install.sh`
+4. `./dzos_remove.sh` 
+5. Ensure your `printer.cfg` saved variables related to `[dzos]` are removed.
 
 ## ISSUES:
 - May not work properly with pause/resume. Untested.
