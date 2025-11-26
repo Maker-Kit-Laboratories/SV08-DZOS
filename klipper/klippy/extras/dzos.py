@@ -89,7 +89,7 @@ class DZOS:
     def cmd_DZOS_Z_CALCULATE(self, gcmd):
         self._init_printer_objects()
         print_data = read_data(print_data_filepath)
-        factor_dict = machine_learning_optimize(print_data)
+        factor_dict = ml_linear_optimize(print_data)
         if factor_dict:
             static_data = read_data(static_filepath)
             static_data["pressure_factor"] = factor_dict["pressure_factor"]
@@ -376,8 +376,14 @@ def delete_file(file_path):
     if os.path.exists(file_path):
         os.remove(file_path)
 
-#Add bed type to learning
-def machine_learning_optimize(print_data_list):
+######################################################################################################################################################################################################
+# ML
+# - Add bed type to learning
+######################################################################################################################################################################################################
+
+
+
+def ml_linear_optimize(print_data_list):
     pressure_list = []
     bed_list = []
     nozzle_list = []
@@ -414,4 +420,7 @@ def machine_learning_optimize(print_data_list):
         "offset_factor": float(offset),
     }
     return factor_dict
+
+
+
 
