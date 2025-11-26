@@ -1,6 +1,9 @@
 
 # DZOS: Dynamic Z Offset and Soaking
 
+### 0.2.06
+- Fixed macro issue not clearing bed mesh.
+
 ### 0.2.05
 - WARNING: INIT MUST BE RE-RUN.
 - Changed calculation method and parameters.
