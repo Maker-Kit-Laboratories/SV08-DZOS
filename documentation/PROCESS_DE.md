@@ -1,3 +1,5 @@
+# `VERALTET`
+
 ![LOGO](./images/dzos_logo.png)
 
 # DZOS: Dynamischer Z-Versatz und Temperatur-Soaking

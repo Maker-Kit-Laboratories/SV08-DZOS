@@ -3,6 +3,7 @@
 
 ### 0.2.07
 - Fixed issue with init.
+- Added more intelligent soaking.
 
 ### 0.2.06
 - Fixed macro issue not clearing bed mesh.
