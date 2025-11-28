@@ -98,6 +98,8 @@ class DZOS:
             static_data["bed_factor"] = factor_dict["bed_factor"]
             static_data["nozzle_factor"] = factor_dict["nozzle_factor"]
             static_data["offset_factor"] = factor_dict["offset_factor"]
+            static_data["rmse"] = factor_dict["rmse"]
+            static_data["r2"] = factor_dict["r2"]
             write_data(static_filepath, static_data)
             self._set_z_offset(-self.probe_offset_z)
             self.global_configfile.set(self.config_name, "calculated", 1)
@@ -428,12 +430,22 @@ def ml_linear_optimize(print_data_list):
 
     result = np.linalg.lstsq(data, target, rcond=None)
     p_factor, b_factor, n_factor, offset = result[0]
+    
+    predicted = data.dot(result[0])
+    residuals = target - predicted
+    sse = float((residuals ** 2).sum())
+    mse = sse / len(target)
+    rmse = float(math.sqrt(mse))
+    ss_tot = float(((target - target.mean()) ** 2).sum())
+    r2 = 1.0 - (sse / ss_tot) if ss_tot > 0 else 0.0
 
     factor_dict = {
         "pressure_factor": float(p_factor),
         "bed_factor": float(b_factor),
         "nozzle_factor": float(n_factor),
         "offset_factor": float(offset),
+        "rmse": rmse,
+        "r2": r2
     }
     return factor_dict
 
