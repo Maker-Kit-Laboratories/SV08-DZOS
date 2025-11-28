@@ -1,6 +1,10 @@
 
 # DZOS: Dynamic Z Offset and Soaking
 
+### 0.2.08
+- Various improvements.
+- Added `DZOS_STATISTICS` command for added information.
+
 ### 0.2.07
 - Fixed issue with init.
 - Added more intelligent soaking.
