@@ -6,6 +6,8 @@
 import json
 import os
 import numpy as np
+import time
+import math
 
 ######################################################################################################################################################################################################
 # PATHS
@@ -51,6 +53,7 @@ class DZOS:
         calibration_nozzle_temperature = int(gcmd.get("NOZZLETEMP", 0))        
         calibration_bed_temperature = int(gcmd.get("BEDTEMP", 0))
         calibration_bed_type = gcmd.get("BEDTYPE", "None")
+        current_bed_temperature = float(gcmd.get("CURRENT_BEDTEMP", 0))
         force_soak_time = int(gcmd.get("FORCE_SOAK_TIME", 0))      
         enable = int(gcmd.get("ENABLE", -1))
         if enable == 1:
@@ -70,14 +73,13 @@ class DZOS:
         if cache_static == 1:
             self._cache_static(gcmd)
             return
-        if calibration_bed_temperature > 0:
-            self._set_temperature(120, blocking=False, bed=False) 
+        if calibration_bed_temperature > 0: 
             self._set_temperature(calibration_bed_temperature, blocking=True)               
-        if not os.path.exists(static_filepath) or self.pressure_xy == [0,0] or self.dzos_calculated == 0:
+        if not os.path.exists(static_filepath) or self.pressure_xy == [0,0]:
             gcmd.respond_info("DZOS: No Static Data Found!")
             self._display_msg("DZOS: No Static!")
             return
-        self._heat_soak(gcmd, force_soak_time)
+        self._heat_soak(gcmd, current_bed_temperature, calibration_bed_temperature, force_soak_time)
         self._calculate_dynamic_offset(
             gcmd, 
             calibration_nozzle_temperature, 
@@ -117,6 +119,7 @@ class DZOS:
         gcmd.respond_info(f"DZOS: Captured Z: {z_offset}")
         print_data = read_data(print_data_filepath)
         print_data[-1]["z_offset"] = z_offset
+        print_data[-1]["timestamp"] = time.time()
         write_data(print_data_filepath, print_data)
         self.cmd_DZOS_Z_CALCULATE(gcmd)
 
@@ -130,6 +133,7 @@ class DZOS:
         self.global_configfile = self.printer.lookup_object('configfile')
         self.heater_bed = self.printer.lookup_object('heater_bed')
         self.extruder = self.printer.lookup_object('extruder')
+        self.heaters = self.printer.lookup_object('heaters')
 
 
     def _init_static_data(self):
@@ -163,7 +167,7 @@ class DZOS:
         self._set_z_zero(e_bed_z)
 
         data_dict = {
-            "e_pressure_nozzle_z": e_pressure_nozzle
+            "e_pressure_nozzle_z": e_pressure_nozzle,
         }
         write_data(static_filepath, data_dict)
 
@@ -196,7 +200,7 @@ class DZOS:
         self._set_z_offset(z_offset + self.probe_offset_z)
 
 
-    def _heat_soak(self, gcmd, force_soak_time=0):
+    def _heat_soak(self, gcmd, current_bed_temperature, bed_temperature, force_soak_time=0):
         if force_soak_time > 0:
             duration = force_soak_time
         else:
@@ -210,19 +214,24 @@ class DZOS:
                 for point in obj["polygon"]:
                     list_of_xs.append(point[0])
                     list_of_ys.append(point[1])
-
             print_min = [min(list_of_xs), min(list_of_ys)]
             print_max = [max(list_of_xs), max(list_of_ys)]
             margin_print_min = [x - margin for x in print_min]
             margin_print_max = [x + margin for x in print_max]
-
             print_max_center_size = max(abs(175 - margin_print_max[0]), abs(175 - margin_print_min[0]), abs(175 - margin_print_max[1]), abs(175 - margin_print_min[1]))
             gcmd.respond_info("DZOS: Center Offset: %.2fmm" % print_max_center_size)
-            duration = max(int(print_max_center_size / 0.087) - 300, 0)
-        gcmd.respond_info("DZOS: Calculated Soak Time: %is" % duration)
-        iteration = 0
+            soak_factor = self._calculate_soak_factor(current_bed_temperature, bed_temperature)
+            gcmd.respond_info("DZOS: Soak Factor: %f" % soak_factor)
+            duration =  int(max(((print_max_center_size / 0.085) - 300) * soak_factor, 60))
+        gcmd.respond_info("DZOS: Soak Time: %is" % duration)
+        iteration = -1
+        nozzle_heater_enabled = False
         while iteration < duration:
-            self._display_msg(f"DZOS: Soak-{int(duration - iteration)}s")
+            remaining = duration - iteration
+            self._display_msg(f"DZOS: Soak-{int(remaining)}s")
+            if not nozzle_heater_enabled and remaining <= 60:
+                self._set_temperature(120, blocking=False, bed=False) 
+                nozzle_heater_enabled = True
             self.toolhead.dwell(1)
             iteration += 1
         return duration
@@ -342,6 +351,15 @@ class DZOS:
         home.cmd_G28(gcmd_home)
 
 
+    def _calculate_soak_factor(self, current_bed_temperature, target_bed_temperature):
+        bed_temperature_difference = target_bed_temperature - current_bed_temperature
+        if bed_temperature_difference < 0:
+            return 0
+        bed_soak_factor = min((bed_temperature_difference / (target_bed_temperature - 22)) * 3.33, 1.0)
+        return bed_soak_factor
+
+
+
 def load_config(config):
     return DZOS(config)
 
@@ -352,11 +370,9 @@ def load_config(config):
 # UTILS
 ######################################################################################################################################################################################################
 
-
 def write_data(file_path, data):
     with open(file_path, "w") as file:
         json.dump(data, file, indent=4)
-
 
 def append_data(file_path, data):
     if not os.path.exists(file_path):
@@ -366,8 +382,7 @@ def append_data(file_path, data):
     with open(file_path, "w") as file:
         json.dump(loaded_data, file, indent=4)
 
-
-def read_data(file_path):
+def read_data(file_path) -> dict:
     with open(file_path, "r") as file:
         data = json.load(file)
     return data
@@ -375,6 +390,7 @@ def read_data(file_path):
 def delete_file(file_path):
     if os.path.exists(file_path):
         os.remove(file_path)
+
 
 ######################################################################################################################################################################################################
 # ML

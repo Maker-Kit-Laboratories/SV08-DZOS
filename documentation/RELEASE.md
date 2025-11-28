@@ -1,6 +1,9 @@
 
 # DZOS: Dynamic Z Offset and Soaking
 
+### 0.2.07
+- Fixed issue with init.
+
 ### 0.2.06
 - Fixed macro issue not clearing bed mesh.
 
