@@ -482,10 +482,10 @@ def ml_get_accuracy(result, data: np.ndarray, target: np.ndarray) -> tuple[float
     predicted_offset = data[:, 3] * offset
 
     statsistics = {
-        "pressure": ml_stat_dict(predicted_pressure),
-        "bed_temperature": ml_stat_dict(predicted_bed),
-        "nozzle_temperature": ml_stat_dict(predicted_nozzle),
-        "offset": ml_stat_dict(predicted_offset)
+        "pressure" : ml_stat_dict(predicted_pressure),
+        "bed_temperature" : ml_stat_dict(predicted_bed),
+        "nozzle_temperature" : ml_stat_dict(predicted_nozzle),
+        "offset" : ml_stat_dict(predicted_offset)
     }
 
     return rmse, r2, statsistics
@@ -493,10 +493,10 @@ def ml_get_accuracy(result, data: np.ndarray, target: np.ndarray) -> tuple[float
 
 def ml_stat_dict(input_list: list[float]) -> dict:
     return {
-        "current": float(input_list[-1]),
-        "mean": float(np.mean(input_list)),
-        "std": float(np.std(input_list)),
-        "min": float(np.min(input_list)),
-        "max": float(np.max(input_list))
+        "current" : float(input_list[-1]),
+        "mean" : float(np.mean(input_list)),
+        "std" : float(np.std(input_list)),
+        "min" : float(np.min(input_list)),
+        "max" : float(np.max(input_list))
     }
 
