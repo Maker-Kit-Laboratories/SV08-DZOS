@@ -4,6 +4,7 @@
 ### 0.2.08
 - Various improvements.
 - Added `DZOS_STATISTICS` command for added information.
+- End print will show factor contributions to the z-offset.
 
 ### 0.2.07
 - Fixed issue with init.
