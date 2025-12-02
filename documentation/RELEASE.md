@@ -76,24 +76,3 @@
 
 ### 0.1.34
 - Initial release. Tested on stock sv08.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## SPECIAL THANKS:
-- Scott
-- Mike @ MK3D
-- Bgoat96
-- ZarkHowler
-- ovrCaffeinatd
-- dwmcqueen
