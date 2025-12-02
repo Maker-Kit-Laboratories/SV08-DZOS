@@ -14,3 +14,4 @@ echo
 echo "DZOS - REMOVED"
 echo
 echo "Please remove [include dzos.cfg] and macros from your configuration files and slicer!"
+echo "Reboot after removal to apply changes."

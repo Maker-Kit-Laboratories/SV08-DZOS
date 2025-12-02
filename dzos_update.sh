@@ -1,14 +1,13 @@
 #!/bin/bash
 
-echo "DZOS - INSTALLATION SCRIPT"
-
+echo "DZOS - UPDATE SCRIPT"
 USER_DIRECTORY="$HOME"
+
+git pull origin main
 
 cp -r -v klipper "$USER_DIRECTORY"
 cp -r -v printer_data "$USER_DIRECTORY"
 
-echo "DZOS - INSTALLED"
-echo
-echo "Please add [include dzos.cfg] and read instructions!"
+echo "DZOS - UPDATED"
 echo "Please reboot to apply changes."
 

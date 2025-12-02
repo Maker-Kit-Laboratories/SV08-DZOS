@@ -1,6 +1,12 @@
 
 # DZOS: Dynamic Z Offset and Soaking
 
+### 0.3.00
+- Calculation rework. Now removes outliers.
+- Test sequence improvement.
+- Added `DZOS_NOZZLE_RESET` command for re-capturing nozzle dimension without capturing all new data.
+- OrcaSlicer bed type training added.
+
 ### 0.2.08
 - Various improvements.
 - Added `DZOS_STATISTICS` command for added information.

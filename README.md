@@ -3,11 +3,11 @@
 
 # DZOS: Dynamic Z Offset and Soaking
 
-**Latest: 0.2.08**
+**Latest: 0.3.00**
 
 ## GOAL:
-1. Solve the SV08 bed and Z issues.
-2. Dynamic Z offset based on current state of bed.
+1. Solve the SV08 bed, Z and induction probe issues.
+2. Dynamic Z offset based on current state of machine.
 3. Dynamic pre-print soak time based on realtime size of print.
 
 ## DISCLAIMER:

@@ -29,6 +29,16 @@ class DZOS:
         self.speed_z_hop = self.config.getfloat('speed_z_hop', default=10)
         self.dzos_enabled = self.config.getint('enabled', default=0)
 
+        self.plate_thickness_dict = {
+            "none": self.config.getfloat('default_plate', default=0.000),
+            "smooth cool plate": self.config.getfloat('smooth_cool', default=0.000),
+            "high temp plate": self.config.getfloat('high_temp', default=0.000),
+            "engineering plate": self.config.getfloat('engineering', default=0.000),
+            "textured pei plate": self.config.getfloat('textured_pei', default=0.000),
+            "textured cool plate": self.config.getfloat('textured_cool', default=0.000),
+            "cool plate (supertack)": self.config.getfloat('cool_super_tack', default=0.000),
+        }
+
         probe_config = self.config.getsection('probe')
         probe_offset_x = probe_config.getfloat('x_offset')
         probe_offset_y = probe_config.getfloat('y_offset')
@@ -53,7 +63,8 @@ class DZOS:
         calibration_bed_temperature = int(gcmd.get("BEDTEMP", 0))
         calibration_bed_type = gcmd.get("BEDTYPE", "None")
         current_bed_temperature = float(gcmd.get("CURRENT_BEDTEMP", 0))
-        force_soak_time = int(gcmd.get("FORCE_SOAK_TIME", 0))      
+        force_soak_time = int(gcmd.get("FORCE_SOAK_TIME", 0))
+        nozzle_reset = int(gcmd.get("NOZZLE_RESET", 0))
         enable = int(gcmd.get("ENABLE", -1))
         if enable == 1:
             self.global_configfile.set(self.config_name, "enabled", 1)
@@ -72,16 +83,21 @@ class DZOS:
         if cache_static == 1:
             self._cache_static(gcmd)
             return
+        if nozzle_reset == 1:
+            self._nozzle_reset(gcmd)
+            return
         if calibration_bed_temperature > 0:
             self._set_temperature(calibration_bed_temperature, blocking=True)               
         if not os.path.exists(static_filepath) or self.pressure_xy == [0,0]:
             gcmd.respond_info("DZOS: No Static Data Found!")
             self._display_msg("DZOS: No Static!")
             return
+        gcmd.respond_info(f"DZOS: Bed Type: {calibration_bed_type}")
+        self._display_msg(f"DZOS: Bed {calibration_bed_type}")
         self._heat_soak(gcmd, current_bed_temperature, calibration_bed_temperature, force_soak_time)
         self._calculate_dynamic_offset(
             gcmd, 
-            calibration_nozzle_temperature, 
+            calibration_nozzle_temperature,
             calibration_bed_temperature, 
             calibration_bed_type
         )
@@ -93,29 +109,35 @@ class DZOS:
         gcmd.respond_info("DZOS: Calc...")
         self._display_msg("DZOS: Calc...")       
         print_data = read_data(print_data_filepath)
-        factor_dict = ml_linear_optimize(print_data)
+        static_data = read_data(static_filepath)
+        factor_dict = ml_linear_optimize(print_data, self.plate_thickness_dict)      
         if factor_dict:
             static_data = read_data(static_filepath)
-            static_data["pressure_factor"] = factor_dict["pressure_factor"]
-            static_data["bed_factor"] = factor_dict["bed_factor"]
             static_data["nozzle_factor"] = factor_dict["nozzle_factor"]
+            static_data["nozzle_temperature_factor"] = factor_dict["nozzle_temperature_factor"]
+            static_data["bed_factor"] = factor_dict["bed_factor"]
+            static_data["bed_temperature_factor"] = factor_dict["bed_temperature_factor"]
+            static_data["bed_thickness_factor"] = factor_dict["bed_thickness_factor"]            
             static_data["offset_factor"] = factor_dict["offset_factor"]
-            static_data["rmse"] = factor_dict["rmse"]
-            static_data["r2"] = factor_dict["r2"]
             static_data["statistics"] = factor_dict["statistics"]
             write_data(static_filepath, static_data) 
             if statistics:
-                gcmd.respond_info(f"DZOS: Accuracy: {factor_dict['r2']:.3f}")
-                gcmd.respond_info(f"DZOS: Pressure Mean: {factor_dict['statistics']['pressure']['mean']:.3f}")
-                gcmd.respond_info(f"DZOS: Bed Mean: {factor_dict['statistics']['bed_temperature']['mean']:.3f}")
-                gcmd.respond_info(f"DZOS: Nozzle Mean: {factor_dict['statistics']['nozzle_temperature']['mean']:.3f}")
+                gcmd.respond_info(f"DZOS: Data Points: {factor_dict['samples']}") 
+                gcmd.respond_info(f"DZOS: Outliers: {factor_dict['outliers']}")
+                gcmd.respond_info(f"DZOS: Nozzle Z Mean: {factor_dict['statistics']['nozzle']['mean']:.3f}")
+                gcmd.respond_info(f"DZOS: Nozzle Temperature Mean: {factor_dict['statistics']['nozzle_temperature']['mean']:.3f}")
+                gcmd.respond_info(f"DZOS: Bed Z Mean: {factor_dict['statistics']['bed']['mean']:.3f}")
+                gcmd.respond_info(f"DZOS: Bed Temperature Mean: {factor_dict['statistics']['bed_temperature']['mean']:.3f}")
+                gcmd.respond_info(f"DZOS: Bed Thickness Mean: {factor_dict['statistics']['bed_thickness']['mean']:.3f}")
                 gcmd.respond_info(f"DZOS: Offset Mean: {factor_dict['statistics']['offset']['mean']:.3f}")
             else:
                 self._set_z_offset(-self.probe_offset_z)
-                gcmd.respond_info(f"DZOS: Pressure: {factor_dict['statistics']['pressure']['current']:.3f}")
-                gcmd.respond_info(f"DZOS: Bed: {factor_dict['statistics']['bed_temperature']['current']:.3f}")
-                gcmd.respond_info(f"DZOS: Nozzle: {factor_dict['statistics']['nozzle_temperature']['current']:.3f}")
-                gcmd.respond_info(f"DZOS: Offset: {factor_dict['statistics']['offset']['current']:.3f}")
+                gcmd.respond_info(f"DZOS: Nozzle Z: {factor_dict['statistics']['nozzle']['last_print']:.3f}")
+                gcmd.respond_info(f"DZOS: Nozzle Temperature: {factor_dict['statistics']['nozzle_temperature']['last_print']:.3f}")
+                gcmd.respond_info(f"DZOS: Bed Z: {factor_dict['statistics']['bed']['last_print']:.3f}")
+                gcmd.respond_info(f"DZOS: Bed Temperature: {factor_dict['statistics']['bed_temperature']['last_print']:.3f}")
+                gcmd.respond_info(f"DZOS: Bed Thickness: {factor_dict['statistics']['bed_thickness']['last_print']:.3f}")
+                gcmd.respond_info(f"DZOS: Offset: {factor_dict['statistics']['offset']['last_print']:.3f}")   
                 gcmd.respond_info("DZOS: Complete!")
         else:
             gcmd.respond_info("DZOS: Not Enough Data!")
@@ -152,31 +174,39 @@ class DZOS:
         try:
             static_data = read_data(static_filepath)
             self.static_e_pressure_nozzle = static_data["e_pressure_nozzle_z"]
-            self.static_pressure_factor = static_data["pressure_factor"]
-            self.static_bed_factor = static_data["bed_factor"]
             self.static_nozzle_factor = static_data["nozzle_factor"]
+            self.static_nozzle_temperature_factor = static_data["nozzle_temperature_factor"]
+            self.static_bed_factor = static_data["bed_factor"]
+            self.static_bed_temperature_factor = static_data["bed_temperature_factor"]
+            self.static_bed_thickness_factor = static_data["bed_thickness_factor"]
             self.static_offset_factor = static_data["offset_factor"]
         except:
-            self.static_pressure_factor = 0
-            self.static_bed_factor = 0
             self.static_nozzle_factor = 0
+            self.static_nozzle_temperature_factor = 0
+            self.static_bed_factor = 0
+            self.static_bed_temperature_factor = 0
+            self.static_bed_thickness_factor = 0
             self.static_offset_factor = 0
 
 
     def _cache_static(self, gcmd):
-        delete_file(print_data_filepath)
-        delete_file(static_filepath)
         self._display_msg("DZOS: Caching..")
         gcmd.respond_info("DZOS: Caching..")
-        b_pressure_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
-        b_pressure_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
-        b_pressure_z = (b_pressure_z_s1 + b_pressure_z_s2) / 2
-        self._set_z_zero(b_pressure_z)
 
+        backup_file(static_filepath)
+        backup_file(print_data_filepath)
+        delete_file(static_filepath)
+        delete_file(print_data_filepath)
+
+        self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
+        b_pressure_z = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
+        self._set_z_zero(b_pressure_z)
+        
+        self._generic_z_probe(gcmd, self.probe_pressure_object, x=self.pressure_nozzle_xy[0], y=self.pressure_nozzle_xy[1])
         e_pressure_nozzle = self._generic_z_probe(gcmd, self.probe_pressure_object, x=self.pressure_nozzle_xy[0], y=self.pressure_nozzle_xy[1])
-        e_bed_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
-        e_bed_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
-        e_bed_z = (e_bed_z_s1 + e_bed_z_s2) / 2
+        
+        self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
+        e_bed_z = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1]) 
         self._set_z_zero(e_bed_z)
 
         data_dict = {
@@ -185,30 +215,47 @@ class DZOS:
         write_data(static_filepath, data_dict)
 
 
+    def _nozzle_reset(self, gcmd):
+        self._display_msg("DZOS: Nozzle..")
+        gcmd.respond_info("DZOS: Nozzle Reset..")
+        
+        d_pressure_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
+        d_pressure_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
+        d_pressure_z = (d_pressure_z_s1 + d_pressure_z_s2) / 2.0
+        self._set_z_zero(d_pressure_z)
+        
+        self._generic_z_probe(gcmd, self.probe_pressure_object, x=self.pressure_nozzle_xy[0], y=self.pressure_nozzle_xy[1])
+        e_pressure_nozzle = self._generic_z_probe(gcmd, self.probe_pressure_object, x=self.pressure_nozzle_xy[0], y=self.pressure_nozzle_xy[1])
+
+        data_dict = {
+            "e_pressure_nozzle_z": e_pressure_nozzle,
+        }
+        write_data(static_filepath, data_dict)
+        self.cmd_DZOS_Z_CALCULATE(gcmd)
+
+
     def _calculate_dynamic_offset(self, gcmd, nozzle_temperature, bed_temperature, bed_type):
         self._display_msg("DZOS: Calc..")
 
-        intial_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
-        intial_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
-        initial_z = (intial_z_s1 + intial_z_s2) / 2
+        initial_z = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
         self._set_z_zero(initial_z)
 
         d_pressure_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
         d_pressure_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.pressure_xy[0], y=self.pressure_xy[1])
-        d_pressure_z = (d_pressure_z_s1 + d_pressure_z_s2) / 2
+        d_pressure_z = (d_pressure_z_s1 + d_pressure_z_s2) / 2.0
         self._set_z_zero(d_pressure_z)
         
         d_bed_z_s1 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
         d_bed_z_s2 = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
-        d_bed_z = (d_bed_z_s1 + d_bed_z_s2) / 2
+        d_bed_z = (d_bed_z_s1 + d_bed_z_s2) / 2.0
         self._set_z_zero(d_bed_z)
             
-        z_offset = self._calculate_z_offset(d_pressure_z, nozzle_temperature, bed_temperature, bed_type)
+        z_offset = self._calculate_z_offset(d_bed_z, nozzle_temperature, bed_temperature, bed_type)
         print_data = self._create_data_dict(d_bed_z, d_pressure_z, nozzle_temperature, bed_temperature, bed_type)
         append_data(print_data_filepath, print_data)
 
         gcmd.respond_info("DZOS: Z Offset: %.3f" % z_offset)
-        self._display_msg(f"DZOS: Z {z_offset:.3f}")
+        self._display_msg(f"DZOS: {z_offset:.3f}")
         
         self._set_z_offset(z_offset + self.probe_offset_z)
 
@@ -255,18 +302,26 @@ class DZOS:
         self.display_status_object.cmd_M117(gcmd)
 
 
-    def _calculate_z_offset(self, 
-            d_pressure_z: float, 
-            nozzle_temperature: int, 
+    def _calculate_z_offset(self,
+            d_bed_z: float,
+            nozzle_temperature: int,            
             bed_temperature: int, 
             bed_type: str
         ) -> float:
         self._init_static_data()
-        if self.static_pressure_factor:
-            target_z_offset = (self.static_pressure_factor * d_pressure_z) + (self.static_nozzle_factor * nozzle_temperature) + (self.static_bed_factor * bed_temperature) + self.static_offset_factor
+        if self.static_bed_factor:
+            target_z_offset = (
+                (self.static_nozzle_factor * -self.static_e_pressure_nozzle) +
+                (self.static_bed_factor * d_bed_z) + (self.static_bed_temperature_factor * bed_temperature) +
+                (self.static_bed_thickness_factor * self.plate_thickness_dict[bed_type.lower()]) + 
+                (self.static_nozzle_temperature_factor * nozzle_temperature) +
+                self.static_offset_factor
+            )
         else:
             target_z_offset = -self.static_e_pressure_nozzle
-        return -target_z_offset
+        target_z_offset = -target_z_offset
+        
+        return target_z_offset
 
 
     def _generic_z_probe(self, gcmd, probe_object, x: float, y: float, hop=True) -> float:
@@ -317,8 +372,8 @@ class DZOS:
 
     def _create_data_dict(self, 
             d_bed_z: float, 
-            d_pressure_z: float, 
-            nozzle_temperature: int, 
+            d_pressure_z: float,
+            nozzle_temperature: int,
             bed_temperature: int, 
             bed_type: str
         ) -> dict:
@@ -412,88 +467,122 @@ def delete_file(file_path):
     if os.path.exists(file_path):
         os.remove(file_path)
 
+def backup_file(file_path):
+    if os.path.exists(file_path):
+        base, ext = os.path.splitext(file_path)
+        backup_path = f"{base}_backup{ext}"
+        delete_file(backup_path)
+        os.rename(file_path, backup_path)
 
 ######################################################################################################################################################################################################
 # ML
-# - Add bed type to learning
 ######################################################################################################################################################################################################
 
 
-def ml_linear_optimize(print_data_list: dict) -> dict:
-    pressure_list = []
-    bed_list = []
+def ml_linear_optimize(print_data: dict, plate_thickness_dict: dict) -> dict:
     nozzle_list = []
+    nozzle_temperature_list = []
+    bed_list = []
+    bed_temperature_list = []
+    bed_thickness_list = []
     z_list = []
-    for entry in print_data_list:
-        pressure = entry.get('d_pressure_z')
-        bed_temperature = entry.get('bed_temperature')
+    for entry in print_data:
+        nozzle: float = entry.get('e_pressure_nozzle_z')
         nozzle_temperature = entry.get('nozzle_temperature')
-        z_offset = entry.get('z_offset')
+        bed: float = entry.get('d_bed_z')
+        bed_temperature = entry.get('bed_temperature')
+        bed_type: str = entry.get('bed_type')
+        z_offset: float = entry.get('z_offset')
         if not z_offset:
             continue
-        pressure_list.append(float(pressure))
-        bed_list.append(float(bed_temperature))
-        nozzle_list.append(float(nozzle_temperature))
-        z_list.append(float(z_offset))
+        nozzle_list.append(-nozzle)
+        nozzle_temperature_list.append(float(nozzle_temperature))
+        bed_list.append(bed)
+        bed_temperature_list.append(float(bed_temperature))
+        bed_thickness_list.append(float(plate_thickness_dict.get(bed_type.lower(), plate_thickness_dict['none'])))
+        z_list.append(z_offset)
     if len(z_list) < 2:
         return
 
     data = np.column_stack([
-        np.array(pressure_list, dtype=float),
-        np.array(bed_list, dtype=float),
         np.array(nozzle_list, dtype=float),
+        np.array(nozzle_temperature_list, dtype=float),
+        np.array(bed_list, dtype=float),
+        np.array(bed_temperature_list, dtype=float),
+        np.array(bed_thickness_list, dtype=float),
         np.ones(len(z_list), dtype=float)
     ])
     target = np.array(z_list, dtype=float)
 
     result = np.linalg.lstsq(data, target, rcond=None)
-    p_factor, b_factor, n_factor, offset = result[0]
+    coefficients, refined_data, refined_target = ml_remove_outliers(result, data, target)
+    nozzle_factor, nozzle_temperature_factor, bed_factor, bed_temperature_factor, bed_thickness_factor, offset = coefficients
 
     factor_dict = {
-        "pressure_factor": float(p_factor),
-        "bed_factor": float(b_factor),
-        "nozzle_factor": float(n_factor),
-        "offset_factor": float(offset),
+        "nozzle_factor": float(nozzle_factor),
+        "nozzle_temperature_factor": float(nozzle_temperature_factor),
+        "bed_factor": float(bed_factor),
+        "bed_temperature_factor": float(bed_temperature_factor),
+        "bed_thickness_factor": float(bed_thickness_factor),
+        "offset_factor": float(offset)
     }
 
-    rmse, r2, statistics = ml_get_accuracy(result, data, target)
-    factor_dict["rmse"] = rmse
-    factor_dict["r2"] = r2
+    statistics = ml_get_statistics(coefficients, refined_data)
+    factor_dict["outliers"] = int(len(target) - len(refined_target))
+    factor_dict["samples"] = len(target)
     factor_dict["statistics"] = statistics
 
     return factor_dict
 
 
-def ml_get_accuracy(result, data: np.ndarray, target: np.ndarray) -> tuple[float, float]:
-    coeffs = result[0]
-    predicted = data.dot(coeffs)
+def ml_remove_outliers(result, data: np.ndarray, target: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    predicted = data.dot(result[0])
     residuals = target - predicted
-    sse = float((residuals ** 2).sum())
-    mse = sse / len(target)
-    rmse = float(math.sqrt(mse))
-    ss_tot = float(((target - target.mean()) ** 2).sum())
-    r2 = 1.0 - (sse / ss_tot) if ss_tot > 0 else 0.0
+    median = np.median(residuals)
+    mad = np.median(np.abs(residuals - median))
+    deviation = 4.0
+    if mad > 0:
+        thresh = deviation * 1.4826 * mad
+    else:
+        std_res = float(np.std(residuals))
+        thresh = deviation * std_res if std_res > 0 else 1e-8
+    mask = np.abs(residuals - median) <= thresh
+    if mask.sum() < len(mask) and mask.sum() >= 2:
+        data_filtered = data[mask]
+        target_filtered = target[mask]
+        refined_result = np.linalg.lstsq(data_filtered, target_filtered, rcond=None)
+        coefficients = refined_result[0]
+        refined_data, refined_target = data_filtered, target_filtered
+    else:
+        refined_data, refined_target = data, target
+    return coefficients, refined_data, refined_target
 
-    p_factor, b_factor, n_factor, offset = coeffs
 
-    predicted_pressure = data[:, 0] * p_factor
-    predicted_bed = data[:, 1] * b_factor
-    predicted_nozzle = data[:, 2] * n_factor
-    predicted_offset = data[:, 3] * offset
+def ml_get_statistics(coefficients, data: np.ndarray) -> tuple[float, float, dict]:
+    nozzle_factor, nozzle_temperature_factor, bed_factor, bed_temperature_factor, bed_thickness_factor, offset = coefficients
 
-    statsistics = {
-        "pressure" : ml_stat_dict(predicted_pressure),
-        "bed_temperature" : ml_stat_dict(predicted_bed),
-        "nozzle_temperature" : ml_stat_dict(predicted_nozzle),
-        "offset" : ml_stat_dict(predicted_offset)
+    predicted_nozzle = data[:, 0] * nozzle_factor
+    predicted_nozzle_temperature = data[:, 1] * nozzle_temperature_factor
+    predicted_bed = data[:, 2] * bed_factor
+    predicted_bed_temperature = data[:, 3] * bed_temperature_factor
+    predicted_bed_thickness = data[:, 4] * bed_thickness_factor
+    predicted_offset = data[:, 5] * offset
+
+    statistics = {
+        "nozzle": ml_stat_dict(predicted_nozzle),
+        "nozzle_temperature": ml_stat_dict(predicted_nozzle_temperature),
+        "bed": ml_stat_dict(predicted_bed),
+        "bed_temperature": ml_stat_dict(predicted_bed_temperature),
+        "bed_thickness": ml_stat_dict(predicted_bed_thickness),
+        "offset": ml_stat_dict(predicted_offset),
     }
 
-    return rmse, r2, statsistics
+    return statistics
 
 
 def ml_stat_dict(input_list: list[float]) -> dict:
     return {
-        "current" : float(input_list[-1]),
+        "last_print" : float(input_list[-1]),
         "mean" : float(np.mean(input_list)),
         "std" : float(np.std(input_list)),
         "min" : float(np.min(input_list)),
