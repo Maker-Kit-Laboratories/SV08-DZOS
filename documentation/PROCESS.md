@@ -41,6 +41,7 @@
     - Remove the included `START_PRINT` from the provided `dzos.cfg` macro.
 2. DZOS can understand plate types from OrcaSlicer. Measure your plates with calipers and enter the thickness into `dzos.cfg`.
     - The stock default plate is 0.6mm.
+3. DZOS can use polynomials once you have sufficient data. In the `dzos.cfg` `polynomial: True|False` will enabled polynomial after `advanced_sample_min` has been reached. Linear otherwise.
 
 ## SETUP:
 1. The setup for DZOS only needs to be done when required. If you change your nozzle dimensions or probe you need to re-run.

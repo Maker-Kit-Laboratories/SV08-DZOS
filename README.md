@@ -3,7 +3,7 @@
 
 # DZOS: Dynamic Z Offset and Soaking
 
-**Latest: 0.3.00**
+**Latest: 0.4.00**
 
 ## GOAL:
 1. Solve the SV08 bed, Z and induction probe issues.

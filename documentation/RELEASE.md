@@ -1,6 +1,10 @@
 
 # DZOS: Dynamic Z Offset and Soaking
 
+### 0.4.00
+- Added polynomial calculation (optional) after a configurable number of samples.
+- Added better debug errors. Rounded out rough edges.
+
 ### 0.3.00
 - Calculation rework. Now removes outliers.
 - Test sequence improvement.
