@@ -484,7 +484,7 @@ class DZOS:
         bed_temperature_difference = target_bed_temperature - current_bed_temperature
         if bed_temperature_difference < 0:
             return 0
-        bed_soak_factor = min((bed_temperature_difference / (target_bed_temperature - 22)) * 2, 1.0)
+        bed_soak_factor = min((bed_temperature_difference / (target_bed_temperature - 22)) * 3.0, 1.0)
         return bed_soak_factor
 
 
@@ -694,7 +694,7 @@ def ml_remove_outliers(result, data: np.ndarray, target: np.ndarray, polynomial:
     residuals = target - predicted
     median = np.median(residuals)
     mad = np.median(np.abs(residuals - median))
-    deviation = 1.5 if polynomial else 3.0
+    deviation = 2.5
     if mad > 0:
         thresh = deviation * 1.4826 * mad
     else:

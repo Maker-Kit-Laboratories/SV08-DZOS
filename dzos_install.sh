@@ -4,8 +4,8 @@ echo "DZOS - INSTALLATION SCRIPT"
 
 USER_DIRECTORY="$HOME"
 
-cp -r -v klipper "$USER_DIRECTORY"
-cp -r -v printer_data "$USER_DIRECTORY"
+cp -r -v -f klipper "$USER_DIRECTORY"
+cp -r -v -f printer_data "$USER_DIRECTORY"
 
 echo "DZOS - INSTALLED"
 echo

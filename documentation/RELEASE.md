@@ -1,6 +1,10 @@
 
 # DZOS: Dynamic Z Offset and Soaking
 
+### 0.4.01
+- Single deviation for linear and poly.
+- Soaking is less aggressive.
+
 ### 0.4.00
 - Added polynomial calculation (optional) after a configurable number of samples.
 - Added better debug errors. Rounded out rough edges.
