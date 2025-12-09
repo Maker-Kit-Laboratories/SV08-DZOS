@@ -8,7 +8,6 @@
 3. Slicer Config: 
     - Configure your slicer to pass `NOZZLETEMP=<###>` `BEDTEMP=<##>` `BEDTYPE=<Textured PEI Plate...>` to `START_PRINT`.
     - OrcaSlicer Example: `START_PRINT NOZZLETEMP=[nozzle_temperature_initial_layer] BEDTEMP=[bed_temperature_initial_layer_single] BEDTYPE="[curr_bed_type]"`
-    - Configure your slicer to pass `DZOS_END_PRINT` after your existing `END_PRINT`.
 4. Ensure your hotend/nozzle is tight! Loose components move more during heat change.
 
 ## INSTALL:
@@ -41,10 +40,16 @@
     - Remove the included `START_PRINT` from the provided `dzos.cfg` macro.
 2. DZOS can understand plate types from OrcaSlicer. Measure your plates with calipers and enter the thickness into `dzos.cfg`.
     - The stock default plate is 0.6mm.
-3. DZOS can use polynomials once you have sufficient data. In the `dzos.cfg` `polynomial: True|False` will enabled polynomial after `advanced_sample_min` has been reached. Linear otherwise.
+3. DZOS has a few addition configurtation options if you want to experiment:
+    - soak_xy - `x,y` : The location of the toolhead during heat soaking. If your printer isn't enclosed, centering it more can help.
+    - soak_multiplier - `1.0` : Multiplier to lengthen or shorten soak duration.
+    - outlier_sample_min - `20` : Minimum number of samples required before outliers are removed.
+    - outlier_deviation - `3.0` : Threshold for outlier removal.
+    - polynomial - `True | False` : Uses a polynomial fit for calculcation.
 
 ## SETUP:
-1. The setup for DZOS only needs to be done when required. If you change your nozzle dimensions or probe you need to re-run.
+0. Set your current z-offset to 0.0 in your `printer.cfg`.
+1. The INIT for DZOS only needs to be done when required. If you change your nozzle dimensions or probe you need to re-run.
 2. IMPORTANT: Wait for your printer to be `cold and at room temperature` for setup.
 3. Remove your toolhead cover for better visibility.
 4. Navigate to the web interface for your printer.
@@ -66,12 +71,12 @@
 
 ## USAGE:
 1. Print as normal. The Z offset and soak time will predict per print. Any adjustments made will help DZOS learn.
-2. Happy testing!
+2. If you change your nozzle to a different sized one, use `DZOS_NOZZLE_RESET` and print as normal.
+3. Happy testing!
 
 ## DISABLE/RE-ENABLE:
 1. `DZOS Disable` macro will stop the code from running. No other changes required.
 2. `DZOS Enable` macro will re-enable usage. You do not have to re-run the setup.
 
 ## ISSUES:
-- DZOS makes predictions based on the information it's given. 
-- May not work properly with pause/resume. Untested.
+- Training takes a few prints.

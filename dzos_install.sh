@@ -10,5 +10,5 @@ cp -r -v -f printer_data "$USER_DIRECTORY"
 echo "DZOS - INSTALLED"
 echo
 echo "Please add [include dzos.cfg] and read instructions!"
-echo "Please reboot to apply changes."
+echo "Please reboot your entire printer to apply changes."
 

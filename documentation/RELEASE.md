@@ -1,6 +1,10 @@
 
 # DZOS: Dynamic Z Offset and Soaking
 
+### 0.4.04
+- Quality of life improvements.
+- Configuration improvements.
+
 ### 0.4.01
 - Single deviation for linear and poly.
 - Soaking is less aggressive.

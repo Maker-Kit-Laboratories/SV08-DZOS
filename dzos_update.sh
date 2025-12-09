@@ -9,5 +9,5 @@ cp -r -v -f klipper "$USER_DIRECTORY"
 cp -r -v -f printer_data "$USER_DIRECTORY"
 
 echo "DZOS - UPDATED"
-echo "Please reboot to apply changes."
+echo "Please reboot your entire printer to apply changes."
 

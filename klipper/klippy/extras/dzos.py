@@ -1,13 +1,16 @@
 ######################################################################################################################################################################################################
 # DZOS: DYNAMIC Z OFFSET AND SOAK
 # AUTHOR: MAKER KIT LABORATORIES
-# VERSION: 0.4.00
+# VERSION: 0.4.04
 ######################################################################################################################################################################################################
 import json
 import os
 import numpy as np
 import time
 import math
+import threading
+
+
 
 ######################################################################################################################################################################################################
 # PATHS
@@ -28,10 +31,15 @@ class DZOS:
         self.hop_z = self.config.getfloat("z_hop", default=7.5)
         self.speed_z_hop = self.config.getfloat('speed_z_hop', default=10)
         self.dzos_enabled = self.config.getint('enabled', default=0)
-
+        
+        self.polynomial = self.config.getboolean('polynomial', default=False)
+        self.outlier_sample_min = self.config.getint('outlier_sample_min', default=20)
+        self.outlier_deviation = self.config.getfloat('outlier_deviation', default=3.0)
+        self.soak_multiplier = self.config.getfloat('soak_multiplier', default=1.0)
+        
         self.plate_thickness_dict = {
             "none": self.config.getfloat('default_plate', default=0.000),
-            "smooth cool plate": self.config.getfloat('smooth_cool', default=0.000),
+            "cool plate": self.config.getfloat('smooth_cool', default=0.000),
             "high temp plate": self.config.getfloat('high_temp', default=0.000),
             "engineering plate": self.config.getfloat('engineering', default=0.000),
             "textured pei plate": self.config.getfloat('textured_pei', default=0.000),
@@ -39,15 +47,15 @@ class DZOS:
             "cool plate (supertack)": self.config.getfloat('cool_super_tack', default=0.000),
         }
 
-        self.polynomial = self.config.getboolean('polynomial', default=False)
-        self.advanced_sample_min = self.config.getint('advanced_sample_min', default=20)
+        self.soak_xy = list(self.config.getfloatlist("soak_xy", count=2, default=[330, 20]))
+
         if self.polynomial:
             print_data = read_data(PRINT_DATA_FILEPATH)
             if not print_data:
                 self.polynomial = False
             else:
                 samples = len(print_data)
-                self.polynomial = True if samples >= self.advanced_sample_min else False
+                self.polynomial = True if samples >= self.outlier_sample_min else False
         probe_config = self.config.getsection('probe')
         probe_offset_x = probe_config.getfloat('x_offset')
         probe_offset_y = probe_config.getfloat('y_offset')
@@ -68,9 +76,15 @@ class DZOS:
     def cmd_DZOS_Z_OFFSET(self, gcmd):
         self._init_printer_objects()
         cache_static = int(gcmd.get("CACHE_STATIC", 0))
-        calibration_nozzle_temperature = int(gcmd.get("NOZZLETEMP", 0))        
-        calibration_bed_temperature = int(gcmd.get("BEDTEMP", 0))
-        calibration_bed_type = gcmd.get("BEDTYPE", "None")
+        input_bed_type = str(gcmd.get("BEDTYPE", "None"))
+        input_bed_temperature = float(gcmd.get("BEDTEMP", 0))
+        input_nozzle_temperature = float(gcmd.get("NOZZLETEMP", 0))
+        if not input_bed_temperature or not input_nozzle_temperature:
+            gcode_temperature = self._read_gcode_temperature()
+            if not input_nozzle_temperature:
+                input_nozzle_temperature = gcode_temperature.get("nozzle_temperature")
+            if not input_bed_temperature:
+                input_bed_temperature = gcode_temperature.get("bed_temperature")
         current_bed_temperature = float(gcmd.get("CURRENT_BEDTEMP", 0))
         force_soak_time = int(gcmd.get("FORCE_SOAK_TIME", 0))
         nozzle_reset = int(gcmd.get("NOZZLE_RESET", 0))
@@ -95,22 +109,23 @@ class DZOS:
         if nozzle_reset == 1:
             self._nozzle_reset(gcmd)
             return
-        if calibration_bed_temperature > 0:
-            self._set_temperature(calibration_bed_temperature, blocking=True)               
+        if input_bed_temperature > 0:
+            self._set_temperature(input_bed_temperature, blocking=True)               
         if not os.path.exists(STATIC_FILEPATH) or self.pressure_xy == [0,0]:
             gcmd.respond_info("DZOS: No Static Data Found!")
             self._display_msg("DZOS: No Static!")
             return
-        gcmd.respond_info(f"DZOS: Bed Type: {calibration_bed_type}")
-        self._display_msg(f"DZOS: Bed {calibration_bed_type}")
-        self._heat_soak(gcmd, current_bed_temperature, calibration_bed_temperature, force_soak_time)
+        gcmd.respond_info(f"DZOS: Bed Type: {input_bed_type}")
+        self._display_msg(f"DZOS: Bed {input_bed_type}")
+        self._heat_soak(gcmd, current_bed_temperature, input_bed_temperature, force_soak_time)
         self._calculate_dynamic_offset(
             gcmd, 
-            calibration_nozzle_temperature,
-            calibration_bed_temperature, 
-            calibration_bed_type,
+            input_nozzle_temperature,
+            input_bed_temperature, 
+            input_bed_type,
             self.polynomial,
         )
+        self._print_thread = self._create_print_thread(gcmd)
 
 
     def cmd_DZOS_Z_CALCULATE(self, gcmd):
@@ -124,9 +139,9 @@ class DZOS:
             self._display_msg("DZOS: No Print!")
             return
         if self.polynomial:
-            factor_dict = ml_polynomial_optimize(print_data, self.plate_thickness_dict, self.advanced_sample_min) 
+            factor_dict = ml_polynomial_optimize(print_data, self.plate_thickness_dict, self.outlier_sample_min, self.outlier_deviation) 
         else:
-            factor_dict = ml_linear_optimize(print_data, self.plate_thickness_dict, self.advanced_sample_min)
+            factor_dict = ml_linear_optimize(print_data, self.plate_thickness_dict, self.outlier_sample_min, self.outlier_deviation)
         if factor_dict:
             static_data = read_data(STATIC_FILEPATH)
             if not static_data:
@@ -166,10 +181,12 @@ class DZOS:
         else:
             gcmd.respond_info("DZOS: Not Enough Data!")
             self._display_msg("DZOS: Data!")
-
+        
 
     def cmd_DZOS_Z_CAPTURE(self, gcmd):
         self._init_printer_objects()
+        gcmd_clear = self.gcode.create_gcode_command("BED_MESH_CLEAR", "BED_MESH_CLEAR", {})
+        self.bed_mesh.cmd_BED_MESH_CLEAR(gcmd_clear)
         toolhead = self.printer.lookup_object('toolhead')
         z_position = toolhead.get_position()[2]
         gcode_position = self.gcode_move._get_gcode_position()
@@ -192,6 +209,9 @@ class DZOS:
         self.heater_bed = self.printer.lookup_object('heater_bed')
         self.extruder = self.printer.lookup_object('extruder')
         self.heaters = self.printer.lookup_object('heaters')
+        self.stats = self.printer.lookup_object('print_stats')
+        self.gcode_macro = self.printer.lookup_object('gcode_macro')
+        self.bed_mesh = self.printer.lookup_object('bed_mesh')
 
 
     def _init_static_data(self):
@@ -207,8 +227,6 @@ class DZOS:
         self.static_bed_temperature_factor2 = static_data.get("bed_temperature_factor2", 0)
         self.static_bed_thickness_factor = static_data.get("bed_thickness_factor", 0)
         self.static_offset_factor = static_data.get("offset_factor", 0)
-
-
 
 
     def _cache_static(self, gcmd):
@@ -305,16 +323,22 @@ class DZOS:
             margin_print_max = [x + margin for x in print_max]
             print_max_center_size = max(abs(175 - margin_print_max[0]), abs(175 - margin_print_min[0]), abs(175 - margin_print_max[1]), abs(175 - margin_print_min[1]))
             gcmd.respond_info("DZOS: Center Offset: %.3fmm" % print_max_center_size)
-            soak_factor = self._calculate_soak_factor(current_bed_temperature, bed_temperature)
+            soak_factor = self._calculate_soak_factor(current_bed_temperature, bed_temperature) * self.soak_multiplier
             gcmd.respond_info("DZOS: Soak Factor: %.3f" % soak_factor)
-            duration =  int(max(((print_max_center_size / 0.085) - 300) * soak_factor, 60))
-        gcmd.respond_info("DZOS: Soak Time: %is" % duration)
+            duration =  int(max(((print_max_center_size / 0.085) - 300) * soak_factor, 120))
         iteration = -1
         nozzle_heater_enabled = False
+        if bed_temperature:
+            self._set_temperature(bed_temperature, blocking=True)
+        self._quad_gantry_level(check=True)
+        if duration > 1:
+            self.toolhead.manual_move([self.soak_xy[0], self.soak_xy[1], None], self.speed)
+            self.toolhead.manual_move([None, None, 5], self.speed_z_hop)
+        gcmd.respond_info("DZOS: Soak Time: %is" % duration)       
         while iteration < duration:
             remaining = duration - iteration
             self._display_msg(f"DZOS: Soak-{int(remaining)}s")
-            if not nozzle_heater_enabled and remaining <= 60:
+            if not nozzle_heater_enabled and remaining <= 120:
                 self._set_temperature(120, blocking=False, bed=False) 
                 nozzle_heater_enabled = True
             self.toolhead.dwell(1)
@@ -468,10 +492,12 @@ class DZOS:
                 self.extruder.cmd_M104(gcmd_heater_set)
 
 
-    def _quad_gantry_level(self):
+    def _quad_gantry_level(self, check=False):
         gcmd_qgl = self.gcode.create_gcode_command("QUAD_GANTRY_LEVEL", "QUAD_GANTRY_LEVEL", {})
         qgl = self.printer.lookup_object('quad_gantry_level')
-        qgl.cmd_QUAD_GANTRY_LEVEL(gcmd_qgl)
+        qgl_status = qgl.get_status(self.printer.get_reactor().monotonic()).get("applied", False)
+        if not check or (check and not qgl_status):
+            qgl.cmd_QUAD_GANTRY_LEVEL(gcmd_qgl)
 
 
     def _home(self, axes: str="Z"):
@@ -486,6 +512,51 @@ class DZOS:
             return 0
         bed_soak_factor = min((bed_temperature_difference / (target_bed_temperature - 22)) * 3.0, 1.0)
         return bed_soak_factor
+
+
+    def _create_print_thread(self, gcmd):
+        print_thread = threading.Thread(target=self._print_end_check, args=(gcmd,))
+        print_thread.start()
+        return print_thread
+    
+
+    def _print_end_check(self, gcmd):
+        printing = True
+        while printing:
+            event_time = self.printer.get_reactor().monotonic()
+            status_dict = self.stats.get_status(event_time)
+            state: str = status_dict["state"]
+            if state.lower() != "printing":
+                printing = False
+                gcmd.respond_info("DZOS: Print End!")
+            else:
+                time.sleep(5)
+        if state.lower() == "complete":
+            self.cmd_DZOS_Z_CAPTURE(gcmd)
+        self._print_thread.join()
+
+
+    def _read_gcode_temperature(self) -> dict:
+        file_path = self._get_active_gcode_file()
+        nozzle_command_list = get_gcode_command(file_path, "M109")
+        bed_command_list = get_gcode_command(file_path, "M190")
+        nozzle_temperature = 0
+        bed_temperature = 0
+        if nozzle_command_list:
+            nozzle_temperature = get_command_temperature(nozzle_command_list[0])
+        if bed_command_list:
+            bed_temperature = get_command_temperature(bed_command_list[0])
+        return {
+            "nozzle_temperature": nozzle_temperature,
+            "bed_temperature": bed_temperature
+        }
+
+
+    def _get_active_gcode_file(self) -> str:
+        virtual_sd = self.printer.lookup_object('virtual_sdcard')
+        virtual_sd_stats = virtual_sd.get_status(self.printer.get_reactor().monotonic())
+        file_path = virtual_sd_stats.get('file_path', None)
+        return file_path
 
 
 def load_config(config):
@@ -503,6 +574,7 @@ def write_data(file_path: str, data: dict):
     except:
         print(f"DZOS: Error Data Write")
 
+
 def append_data(file_path: str, data: dict):
     try:
         if not os.path.exists(file_path):
@@ -514,6 +586,7 @@ def append_data(file_path: str, data: dict):
     except:
         print(f"DZOS: Error Data Append")
 
+
 def read_data(file_path: str) -> dict:  
     try:
         if os.path.exists(file_path):
@@ -523,12 +596,14 @@ def read_data(file_path: str) -> dict:
     except:
         print(f"DZOS: Error Data Read")
 
+
 def delete_file(file_path):
     try:
         if os.path.exists(file_path):
             os.remove(file_path)
     except:
         print(f"DZOS: Error Deleting File")
+
 
 def backup_file(file_path):
     try:
@@ -539,6 +614,29 @@ def backup_file(file_path):
             os.rename(file_path, backup_path)
     except:
         print(f"DZOS: Error Backing Up File")
+
+
+def get_gcode_command(file_path: str, command: str) -> list:
+    command_list = []
+    try:
+        with open(file_path, "r") as file:
+            for line in file:
+                line = line.strip()
+                if line.startswith(command):
+                    command_list.append(line)
+    except:
+        print(f"DZOS: Error Reading Gcode File")
+    return command_list
+
+
+def get_command_temperature(command: str) -> int:
+    parts = command.split()
+    for part in parts:
+        if part.startswith("S"):
+            temperature_str = part[1:]
+            temperature = int(temperature_str.split(";")[0])
+            return temperature
+
 
 ######################################################################################################################################################################################################
 # ML
@@ -553,7 +651,7 @@ def ml_stat_dict(input_list: list[float]) -> dict:
         "max" : float(np.max(input_list))
     }
 
-def ml_linear_optimize(print_data: dict, plate_thickness_dict: dict, advanced_sample_min: int) -> dict:
+def ml_linear_optimize(print_data: dict, plate_thickness_dict: dict, outlier_sample_min: int, outlier_deviation: float) -> dict:
     nozzle_list = []
     nozzle_temperature_list = []
     bed_list = []
@@ -591,8 +689,8 @@ def ml_linear_optimize(print_data: dict, plate_thickness_dict: dict, advanced_sa
 
     result = np.linalg.lstsq(data, target, rcond=None)
 
-    if samples >= advanced_sample_min:
-        coefficients, processed_data, processed_target = ml_remove_outliers(result, data, target, polynomial=False)
+    if samples >= outlier_sample_min:
+        coefficients, processed_data, processed_target = ml_remove_outliers(result, data, target, outlier_deviation)
     else:
         coefficients = result[0]
         processed_data = data
@@ -617,7 +715,7 @@ def ml_linear_optimize(print_data: dict, plate_thickness_dict: dict, advanced_sa
 
 
 
-def ml_polynomial_optimize(print_data: dict, plate_thickness_dict: dict, advanced_sample_min: int) -> dict:
+def ml_polynomial_optimize(print_data: dict, plate_thickness_dict: dict, outlier_sample_min: int, outlier_deviation: float) -> dict:
     nozzle_list = []
     nozzle_temperature_list = []
     bed_list = []
@@ -657,8 +755,8 @@ def ml_polynomial_optimize(print_data: dict, plate_thickness_dict: dict, advance
 
     result = np.linalg.lstsq(polynomial_data, target, rcond=None)
 
-    if samples >= advanced_sample_min:
-        coefficients, processed_data, processed_target = ml_remove_outliers(result, polynomial_data, target, polynomial=True)
+    if samples >= outlier_sample_min:
+        coefficients, processed_data, processed_target = ml_remove_outliers(result, polynomial_data, target, outlier_deviation)
     else:
         coefficients = result[0]
         processed_data = polynomial_data
@@ -689,17 +787,16 @@ def ml_polynomial_optimize(print_data: dict, plate_thickness_dict: dict, advance
     return factor_dict
 
 
-def ml_remove_outliers(result, data: np.ndarray, target: np.ndarray, polynomial: bool) -> tuple[np.ndarray, np.ndarray]:
+def ml_remove_outliers(result, data: np.ndarray, target: np.ndarray, outlier_deviation: float) -> tuple[np.ndarray, np.ndarray]:
     predicted = data.dot(result[0])
     residuals = target - predicted
     median = np.median(residuals)
     mad = np.median(np.abs(residuals - median))
-    deviation = 2.5
     if mad > 0:
-        thresh = deviation * 1.4826 * mad
+        thresh = outlier_deviation * 1.4826 * mad
     else:
         std_res = float(np.std(residuals))
-        thresh = deviation * std_res if std_res > 0 else 1e-8
+        thresh = outlier_deviation * std_res if std_res > 0 else 1e-8
     mask = np.abs(residuals - median) <= thresh
     if mask.sum() < len(mask) and mask.sum() >= 2:
         data_filtered = data[mask]
@@ -709,6 +806,7 @@ def ml_remove_outliers(result, data: np.ndarray, target: np.ndarray, polynomial:
         processed_data, processed_target = data_filtered, target_filtered
     else:
         processed_data, processed_target = data, target
+        coefficients = result[0]
     return coefficients, processed_data, processed_target
 
 
