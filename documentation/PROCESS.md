@@ -69,7 +69,7 @@
     - **F:** Automatic capture of user input z offset.
     - **G:** `BEEP - USER INTERACTION - BEEP:` Clean finished print either immediately or during the next step.
     - **H:** 1000 second heat soak at 65C.
-    - **I:** Repeat of C -> F.
+    - **I:** Printer will repeat C -> F.
     - **J:** Setup is finished. Printer will reboot.
 
 ## USAGE:
