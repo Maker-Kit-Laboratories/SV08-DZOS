@@ -16,12 +16,14 @@
 3. `cd SV08-DZOS`
 4. `chmod +x dzos_install.sh`
 5. `./dzos_install.sh`
+6. Restart your entire printer.
 
 ## UPDATE:
 1. Access the SV08 via SSH. ( `ssh sovol@<your sv08 ip>` )
 2. `cd SV08-DZOS`
 3. `chmod +x dzos_update.sh`
 4. `./dzos_update.sh`
+5. Restart your entire printer.
 
 ## UNINSTALL:
 1. Access the SV08 via SSH. ( `ssh sovol@<your sv08 ip>` )
@@ -29,6 +31,7 @@
 3. `chmod +x dzos_install.sh`
 4. `./dzos_remove.sh` 
 5. Ensure your `printer.cfg` saved variables related to `[dzos]` are removed.
+6. Restart your entire printer.
 
 ## CONFIGURATION (OPTIONAL):
 - NOTE: The `dzos.cfg` overrides your `START_PRINT`. This is default but optional.
