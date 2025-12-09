@@ -70,7 +70,7 @@
     - **G:** `BEEP - USER INTERACTION - BEEP:` Clean finished print either immediately or during the next step.
     - **H:** 1000 second heat soak at 65C.
     - **I:** Printer will repeat C -> F.
-    - **J:** Setup is finished. Printer will reboot.
+    - **J:** Setup is finished.
 
 ## USAGE:
 1. Print as normal. The Z offset and soak time will predict per print. Any adjustments made will help DZOS learn.
