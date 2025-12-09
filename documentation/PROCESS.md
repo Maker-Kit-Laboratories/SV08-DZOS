@@ -48,7 +48,7 @@
     - polynomial - `True | False` : Uses a polynomial fit for calculcation.
 
 ## SETUP:
-0. Set your current z-offset to 0.0 in your `printer.cfg`.
+0. Set your current z-offset to 0.0 in your `printer.cfg` in the saved section.
 1. The INIT for DZOS only needs to be done when required. If you change your nozzle dimensions or probe you need to re-run.
 2. IMPORTANT: Wait for your printer to be `cold and at room temperature` for setup.
 3. Remove your toolhead cover for better visibility.
@@ -79,4 +79,4 @@
 2. `DZOS Enable` macro will re-enable usage. You do not have to re-run the setup.
 
 ## ISSUES:
-- Training takes a few prints.
+- Training takes a few prints. Doing a few one layer prints with the materials you use helps speed it up.
