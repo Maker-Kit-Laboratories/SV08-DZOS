@@ -196,7 +196,7 @@ class DZOS:
         print_data: list[dict] = read_data(PRINT_DATA_FILEPATH)
         if not print_data:
             return
-        if print_data[-1].get("z_offset", None):
+        if not print_data[-1].get("z_offset", None):
             print_data[-1]["z_offset"] = z_offset
             print_data[-1]["timestamp"] = time.time()
             write_data(PRINT_DATA_FILEPATH, print_data)
