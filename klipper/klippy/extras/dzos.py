@@ -159,11 +159,11 @@ class DZOS:
             static_data["bed_thickness_factor"] = factor_dict["bed_thickness_factor"]    
             static_data["offset_factor"] = factor_dict["offset_factor"]
             static_data["statistics"] = factor_dict["statistics"]
-            write_data(STATIC_FILEPATH, static_data) 
+            write_data(STATIC_FILEPATH, static_data)
             if statistics:
                 gcmd.respond_info(f"DZOS: Type: {'Polynomial' if self.polynomial else 'Linear'}")
                 gcmd.respond_info(f"DZOS: Samples: {factor_dict['statistics']['samples']}") 
-                gcmd.respond_info(f"DZOS: Outliers: {factor_dict['statistics']['outliers']}")
+                gcmd.respond_info(f"DZOS: Outliers: {factor_dict['statistics']['outliers']} [{','.join(factor_dict['statistics']['outlier_indices'])}]")
                 gcmd.respond_info(f"DZOS: Error: ±{factor_dict['statistics']['error']:.3f}")
                 gcmd.respond_info(f"DZOS: Nozzle Z: {factor_dict['statistics']['nozzle']['mean']:.3f}")
                 gcmd.respond_info(f"DZOS: Nozzle Temperature: {factor_dict['statistics']['nozzle_temperature']['mean']:.3f}")
@@ -193,11 +193,14 @@ class DZOS:
         z = gcode_position[2]
         z_offset = z - (z_position - self.probe_offset_z)
         gcmd.respond_info(f"DZOS: Captured Z: {z_offset}")
-        print_data = read_data(PRINT_DATA_FILEPATH)
-        print_data[-1]["z_offset"] = z_offset
-        print_data[-1]["timestamp"] = time.time()
-        write_data(PRINT_DATA_FILEPATH, print_data)
-        self.cmd_DZOS_Z_CALCULATE(gcmd)
+        print_data: list[dict] = read_data(PRINT_DATA_FILEPATH)
+        if not print_data:
+            return
+        if print_data[-1].get("z_offset", None):
+            print_data[-1]["z_offset"] = z_offset
+            print_data[-1]["timestamp"] = time.time()
+            write_data(PRINT_DATA_FILEPATH, print_data)
+            self.cmd_DZOS_Z_CALCULATE(gcmd)
 
 
     def _init_printer_objects(self):
@@ -690,11 +693,12 @@ def ml_linear_optimize(print_data: dict, plate_thickness_dict: dict, outlier_sam
     result = np.linalg.lstsq(data, target, rcond=None)
 
     if samples >= outlier_sample_min:
-        coefficients, processed_data, processed_target = ml_remove_outliers(result, data, target, outlier_deviation)
+        coefficients, processed_data, processed_target, outlier_indices = ml_remove_outliers(result, data, target, outlier_deviation)
     else:
         coefficients = result[0]
         processed_data = data
         processed_target = target
+        outlier_indices = []
     nozzle_factor, nozzle_temperature_factor, bed_factor, bed_temperature_factor, bed_thickness_factor, offset = coefficients
 
     factor_dict = {
@@ -704,12 +708,12 @@ def ml_linear_optimize(print_data: dict, plate_thickness_dict: dict, outlier_sam
         "bed_temperature_factor": float(bed_temperature_factor),
         "bed_thickness_factor": float(bed_thickness_factor),
         "offset_factor": float(offset),
-        "outliers" : int(len(target) - len(processed_target)),
-        "samples" : int(samples),
+
         "statistics" : ml_get_statistics(coefficients, processed_data, processed_target, polynomial=False)
     }
     factor_dict['statistics']['samples'] = int(samples)
     factor_dict['statistics']['outliers'] = int(len(target) - len(processed_target))
+    factor_dict['statistics']['outlier_indices'] = outlier_indices
     return factor_dict
 
 
@@ -756,11 +760,12 @@ def ml_polynomial_optimize(print_data: dict, plate_thickness_dict: dict, outlier
     result = np.linalg.lstsq(polynomial_data, target, rcond=None)
 
     if samples >= outlier_sample_min:
-        coefficients, processed_data, processed_target = ml_remove_outliers(result, polynomial_data, target, outlier_deviation)
+        coefficients, processed_data, processed_target, outlier_indices = ml_remove_outliers(result, polynomial_data, target, outlier_deviation)
     else:
         coefficients = result[0]
         processed_data = polynomial_data
         processed_target = target
+        outlier_indices = []
 
     nozzle_factor = coefficients[0]
     nozzle_temperature_factor = coefficients[1]
@@ -784,10 +789,11 @@ def ml_polynomial_optimize(print_data: dict, plate_thickness_dict: dict, outlier
     }
     factor_dict['statistics']['samples'] = int(samples)
     factor_dict['statistics']['outliers'] = int(samples - len(processed_target))
+    factor_dict['statistics']['outlier_indices'] = outlier_indices
     return factor_dict
 
 
-def ml_remove_outliers(result, data: np.ndarray, target: np.ndarray, outlier_deviation: float) -> tuple[np.ndarray, np.ndarray]:
+def ml_remove_outliers(result, data: np.ndarray, target: np.ndarray, outlier_deviation: float) -> tuple:
     predicted = data.dot(result[0])
     residuals = target - predicted
     median = np.median(residuals)
@@ -807,7 +813,8 @@ def ml_remove_outliers(result, data: np.ndarray, target: np.ndarray, outlier_dev
     else:
         processed_data, processed_target = data, target
         coefficients = result[0]
-    return coefficients, processed_data, processed_target
+    outlier_indices = np.where(~mask)[0]
+    return coefficients, processed_data, processed_target, outlier_indices
 
 
 def ml_get_statistics(coefficients, data: np.ndarray, target: np.ndarray, polynomial: bool) -> dict:

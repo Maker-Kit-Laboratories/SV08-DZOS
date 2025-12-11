@@ -1,6 +1,9 @@
 
 # DZOS: Dynamic Z Offset and Soaking
 
+### 0.4.08
+- Bug with INIT from callback
+
 ### 0.4.04
 - Quality of life improvements.
 - Configuration improvements.
