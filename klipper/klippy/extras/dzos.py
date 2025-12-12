@@ -47,15 +47,8 @@ class DZOS:
             "cool plate (supertack)": self.config.getfloat('cool_super_tack', default=0.000),
         }
 
-        self.soak_xy = list(self.config.getfloatlist("soak_xy", count=2, default=[330, 20]))
+        self.soak_xyz = list(self.config.getfloatlist("soak_xyz", count=3, default=[330, 20, 1]))
 
-        if self.polynomial:
-            print_data = read_data(PRINT_DATA_FILEPATH)
-            if not print_data:
-                self.polynomial = False
-            else:
-                samples = len(print_data)
-                self.polynomial = True if samples >= self.outlier_sample_min else False
         probe_config = self.config.getsection('probe')
         probe_offset_x = probe_config.getfloat('x_offset')
         probe_offset_y = probe_config.getfloat('y_offset')
@@ -162,7 +155,7 @@ class DZOS:
             write_data(STATIC_FILEPATH, static_data)
             if statistics:
                 gcmd.respond_info(f"DZOS: Type: {'Polynomial' if self.polynomial else 'Linear'}")
-                gcmd.respond_info(f"DZOS: Samples: {factor_dict['statistics']['samples']}") 
+                gcmd.respond_info(f"DZOS: Samples: {factor_dict['statistics']['samples']}")
                 gcmd.respond_info(f"DZOS: Outliers: {factor_dict['statistics']['outliers']} [{','.join(factor_dict['statistics']['outlier_indices'])}]")
                 gcmd.respond_info(f"DZOS: Error: ±{factor_dict['statistics']['error']:.3f}")
                 gcmd.respond_info(f"DZOS: Nozzle Z: {factor_dict['statistics']['nozzle']['mean']:.3f}")
@@ -206,6 +199,10 @@ class DZOS:
     def _init_printer_objects(self):
         self.toolhead = self.printer.lookup_object('toolhead')
         self.probe_object = self.printer.lookup_object('probe')
+        #try:
+        #    self.probe_object = self.printer.lookup_object('probe_eddy_current')
+        #except:
+        #    self.probe_object = self.printer.lookup_object('probe')            
         self.probe_pressure_object = self.printer.lookup_object('probe_pressure')
         self.display_status_object = self.printer.lookup_object('display_status')
         self.global_configfile = self.printer.lookup_object('configfile')
@@ -335,8 +332,8 @@ class DZOS:
             self._set_temperature(bed_temperature, blocking=True)
         self._quad_gantry_level(check=True)
         if duration > 1:
-            self.toolhead.manual_move([self.soak_xy[0], self.soak_xy[1], None], self.speed)
-            self.toolhead.manual_move([None, None, 5], self.speed_z_hop)
+            self.toolhead.manual_move([self.soak_xyz[0], self.soak_xyz[1], None], self.speed)
+            self.toolhead.manual_move([None, None, self.soak_xyz[2]], self.speed_z_hop)
         gcmd.respond_info("DZOS: Soak Time: %is" % duration)       
         while iteration < duration:
             remaining = duration - iteration
@@ -426,6 +423,15 @@ class DZOS:
         probe_session.end_probe_session()
         return probe_z
 
+    def _eddy_z_probe(self, gcmd, probe_object, x: float, y: float, hop=True) -> float:
+        if hop:
+            self._execute_hop_z(self.hop_z)
+            self.toolhead.manual_move([x, y, None], self.speed)
+        probe_session = probe_object.start_probe_session(gcmd)
+        probe_session.run_probe(gcmd)
+        probe_z = probe_session.pull_probed_results()[0][2]
+        probe_session.end_probe_session()
+        return probe_z
 
     def _set_z_zero(self, z: float):
         current = list(self.toolhead.get_position())
@@ -814,7 +820,8 @@ def ml_remove_outliers(result, data: np.ndarray, target: np.ndarray, outlier_dev
         processed_data, processed_target = data, target
         coefficients = result[0]
     outlier_indices = np.where(~mask)[0]
-    return coefficients, processed_data, processed_target, outlier_indices
+    outlier_indices_str = [str(outlier) for outlier in outlier_indices]
+    return coefficients, processed_data, processed_target, outlier_indices_str
 
 
 def ml_get_statistics(coefficients, data: np.ndarray, target: np.ndarray, polynomial: bool) -> dict:
