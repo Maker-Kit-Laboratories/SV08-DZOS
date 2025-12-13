@@ -1,7 +1,7 @@
 ######################################################################################################################################################################################################
 # DZOS: DYNAMIC Z OFFSET AND SOAK
 # AUTHOR: MAKER KIT LABORATORIES
-# VERSION: 0.4.04
+# VERSION: 0.4.09
 ######################################################################################################################################################################################################
 import json
 import os
@@ -33,6 +33,7 @@ class DZOS:
         self.dzos_enabled = self.config.getint('enabled', default=0)
         
         self.polynomial = self.config.getboolean('polynomial', default=False)
+        self.polynomial_sample_min = self.config.getint('polynomial_sample_min', default=20)
         self.outlier_sample_min = self.config.getint('outlier_sample_min', default=20)
         self.outlier_deviation = self.config.getfloat('outlier_deviation', default=3.0)
         self.soak_multiplier = self.config.getfloat('soak_multiplier', default=1.0)
@@ -60,6 +61,10 @@ class DZOS:
 
         self.gcode = self.printer.lookup_object('gcode')
         self.gcode_move = self.printer.lookup_object('gcode_move')
+
+        print_data = read_data(PRINT_DATA_FILEPATH)
+        if self.polynomial and print_data:
+            self.polynomial = True if len(print_data) > self.polynomial_sample_min else False                    
 
         self.gcode.register_command("DZOS_Z_OFFSET", self.cmd_DZOS_Z_OFFSET)
         self.gcode.register_command("DZOS_Z_CALCULATE", self.cmd_DZOS_Z_CALCULATE)
@@ -198,11 +203,10 @@ class DZOS:
 
     def _init_printer_objects(self):
         self.toolhead = self.printer.lookup_object('toolhead')
-        self.probe_object = self.printer.lookup_object('probe')
-        #try:
-        #    self.probe_object = self.printer.lookup_object('probe_eddy_current')
-        #except:
-        #    self.probe_object = self.printer.lookup_object('probe')            
+        try:
+            self.probe_object = self.printer.lookup_object('probe_eddy_current')
+        except:
+            self.probe_object = self.printer.lookup_object('probe')            
         self.probe_pressure_object = self.printer.lookup_object('probe_pressure')
         self.display_status_object = self.printer.lookup_object('display_status')
         self.global_configfile = self.printer.lookup_object('configfile')

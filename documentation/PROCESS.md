@@ -44,14 +44,15 @@
 2. DZOS can understand plate types from OrcaSlicer. Measure your plates with calipers and enter the thickness into `dzos.cfg`.
     - The stock default plate is 0.6mm.
 3. DZOS has a few addition configurtation options if you want to experiment:
-    - soak_xy - `x,y` : The location of the toolhead during heat soaking. If your printer isn't enclosed, centering it more can help.
+    - soak_xy - `x,y,z` : The location of the toolhead during heat soaking. If your printer isn't enclosed, centering it more can help.
     - soak_multiplier - `1.0` : Multiplier to lengthen or shorten soak duration.
     - outlier_sample_min - `20` : Minimum number of samples required before outliers are removed.
     - outlier_deviation - `3.0` : Threshold for outlier removal.
     - polynomial - `True | False` : Uses a polynomial fit for calculcation.
+    - polynomial_sample_min - `20` : Minimum number of samples required for polynomial fit.
 
-## SETUP:
-0. Set your current z-offset to 0.0 in your `printer.cfg` in the saved section.
+## SETUP (IMPORTANT):
+0. Set your current `z-offset` to `0.0` in your `printer.cfg` in the saved section.
 1. The INIT for DZOS only needs to be done when required. If you change your nozzle dimensions or probe you need to re-run.
 2. IMPORTANT: Wait for your printer to be `cold and at room temperature` for setup.
 3. Remove your toolhead cover for better visibility.
