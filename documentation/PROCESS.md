@@ -68,8 +68,8 @@
     - Ensure you slicer is passing the temperature to your `START_PRINT`.
     - Remove the included `START_PRINT` from the provided `dzos.cfg` macro.
 2. DZOS has a few addition configurtation options if you want to experiment:
-    - sensor_name - `none` : Name of your chamber, toolhead, or eddy temperature sensor
-    - eddy - `False | True` : True if using an eddy current probe of any kind
+    - sensor_name - `none` : Name of your chamber, toolhead, or eddy temperature sensor.
+    - eddy - `False | True` : True if using an eddy current probe of any kind.
     - soak_xy - `x,y,z` : The location of the toolhead during heat soaking. If your printer isn't enclosed, centering it more can help.
     - soak_multiplier - `1.0` : Multiplier to lengthen or shorten soak duration.
     - outlier_sample_min - `20` : Minimum number of samples required before outliers are removed.
