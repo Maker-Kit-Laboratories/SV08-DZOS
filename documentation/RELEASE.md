@@ -5,6 +5,7 @@
 - Added support for eddy current sensors of all kinds. With a temperature sensor.
 - Added generic temperature sensor support. <u>If used you have to re-run the init.</u>
 - Updated documentation/process instructions.
+- Bed plate thickness removed.
 
 ### 0.4.09
 - Small improvments / fixes.
