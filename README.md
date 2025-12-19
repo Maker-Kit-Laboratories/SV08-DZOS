@@ -3,13 +3,13 @@
 
 # DZOS: Dynamic Z Offset and Soaking
 
-**Latest: 0.4.09**
+**Latest: 0.5.00**
 
 ## DESCRIPTION:
 - Machine learning for z-offset based on user training. DZOS predicts bed movement, nozzle movement and sensor drift. DZOS will also soak the bed/probe based on print size.
 
 ## GOAL:
-1. Solve the SV08 bed, Z and induction probe issues.
+1. Solve the SV08 Z issues.
 2. Dynamic Z offset based on current state of machine.
 3. Dynamic pre-print soak time based on realtime size of print.
 

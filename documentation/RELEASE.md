@@ -1,11 +1,16 @@
 
 # DZOS: Dynamic Z Offset and Soaking
 
+### 0.5.00
+- Added support for eddy current sensors of all kinds. With a temperature sensor.
+- Added generic temperature sensor support. <u>If used you have to re-run the init.</u>
+- Updated documentation/process instructions.
+
 ### 0.4.09
-- Small improvments / fixes
+- Small improvments / fixes.
 
 ### 0.4.08
-- Bug with INIT from callback
+- Bug with INIT from callback.
 
 ### 0.4.04
 - Quality of life improvements.
