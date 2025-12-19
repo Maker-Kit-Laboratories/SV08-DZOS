@@ -3,7 +3,7 @@
 # DZOS: Dynamic Z Offset and Soaking
 
 ## PRE-REQUISITES:
-1. SV08 3D Printer with an `inductive` or `eddy` sensor and the pressure/load cell working.
+1. SV08 3D Printer with an `inductive` or `eddy` sensor and the stock pressure/load cell working.
 2. Terminal / Powershell
 3. Slicer Config: 
     - Configure your slicer to pass `NOZZLETEMP=<###>` `BEDTEMP=<##>` `BEDTYPE=<Slicer Bed Type>` to `START_PRINT`.
