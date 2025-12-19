@@ -35,7 +35,7 @@
 
 ## SETUP (IMPORTANT):
 0. READ `dzos.cfg` comments first.
-1. If using an eddy type probe, set `eddy` to `True` in `dzos.cfg`.
+1. If using an eddy type probe, set `eddy` to `True` in `dzos.cfg`. `DO NOT` use klippers built in eddy temperature compenstion. Just calibrate your eddy once.
 2. Set the `sensor_name` to match your eddy probe temperature sensor. If not using an eddy sensor, set sensor_name to your toolhead temperature sensor.
 3. Set your current `z-offset` to `0.0` in your `printer.cfg` saved section.
 4. In `dzos.cfg` you must set eddy to `True` if using an eddy. The eddy must be minimally calibrated prior to DZOS use.
@@ -77,7 +77,7 @@
     - polynomial - `True | False` : Uses a polynomial fit for calculcation.
     - polynomial_sample_min - `10` : Minimum number of samples required for polynomial fit.
 3. DZOS understands the default bed plate types from OrcaSlicer and will learn from there usage.
-    - Too keep track of what print is associated with what bed plate, use a name in the gcode file.
+    - To keep track of what print is associated with what bed plate, use a name in the gcode file.
 
 ## USAGE:
 1. Print as normal. The Z offset and soak time will predict per print. Manual Z adjustments made will help DZOS learn.
