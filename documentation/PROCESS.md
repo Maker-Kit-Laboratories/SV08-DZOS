@@ -36,11 +36,10 @@
 6. Restart your entire printer.
 
 ## SETUP:
-0. READ `dzos.cfg` comments first.
-1. If using an eddy type probe, set `eddy` to the name of your eddy current probe in `dzos.cfg`. `DO NOT` use klippers built in eddy temperature compenstion. Just calibrate your eddy once.
-2. Set the `sensor_name` to match your eddy probe temperature sensor. If not using an eddy sensor, set sensor_name to your toolhead temperature sensor.
-3. Set your current `z-offset` to `0.0` in your `printer.cfg` saved section.
-4. In `dzos.cfg` you must set eddy to `True` if using an eddy. The eddy must be minimally calibrated prior to DZOS use.
+1. READ `dzos.cfg` comments first.
+2. If using an eddy type probe, set `eddy` to the name of your eddy current probe in `dzos.cfg`. `DO NOT` use klippers built in eddy temperature compenstion. Just calibrate your eddy once.
+3. Set the `sensor_name` to match your eddy probe temperature sensor. If not using an eddy sensor, set sensor_name to your toolhead temperature sensor.
+4. Set your current `z-offset` to `0.0` in your `printer.cfg` saved section.
 5. The INIT for DZOS only needs to be done when required. If you change your nozzle dimensions or probe you need to re-run.
 6. IMPORTANT: Wait for your printer to be `cold and at room temperature` for setup.
 7. Remove your toolhead cover for better visibility.
