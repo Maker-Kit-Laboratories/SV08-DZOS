@@ -1,6 +1,11 @@
 
 # DZOS: Dynamic Z Offset and Soaking
 
+
+### 0.5.01
+- Eddy improvements.
+- Added force plate macros.
+
 ### 0.5.00
 - Added support for eddy current sensors of all kinds. With a temperature sensor.
 - Added generic temperature sensor support. <u>If used you have to re-run the init.</u>
@@ -8,7 +13,7 @@
 - Bed plate thickness removed.
 
 ### 0.4.09
-- Small improvments / fixes.
+- Small improvements / fixes.
 
 ### 0.4.08
 - Bug with INIT from callback.

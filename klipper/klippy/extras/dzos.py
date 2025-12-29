@@ -1,7 +1,7 @@
 ######################################################################################################################################################################################################
 # DZOS: DYNAMIC Z OFFSET AND SOAK
 # AUTHOR: MAKER KIT LABORATORIES
-# VERSION: 0.5.00
+# VERSION: 0.5.01
 ######################################################################################################################################################################################################
 import json
 import os
@@ -31,7 +31,8 @@ class DZOS:
         self.speed_z_hop = self.config.getfloat('speed_z_hop', default=10)
         self.dzos_enabled = self.config.getint('enabled', default=0)
 
-        self.eddy = self.config.getboolean('eddy', default=False)
+        self.eddy_name = self.config.get('eddy_name', default='none')
+        self.eddy = True if self.eddy_name != 'none' else False
         self.pressure_sensor = self.config.getboolean('pressure_sensor', default=False)
         self.sensor_name = self.config.get('sensor_name', default='none')
         
@@ -53,10 +54,16 @@ class DZOS:
 
         self.soak_xyz = list(self.config.getfloatlist("soak_xyz", count=3, default=[330, 20, 1]))
 
-        probe_config = self.config.getsection('probe')
-        probe_offset_x = probe_config.getfloat('x_offset')
-        probe_offset_y = probe_config.getfloat('y_offset')
-        self.probe_offset_z = probe_config.getfloat('z_offset')
+        if self.eddy:
+            probe_object = self.printer.lookup_object(f"probe_eddy_current {self.eddy_name}")
+            probe_offset_x = probe_object.probe_offsets.x_offset
+            probe_offset_y = probe_object.probe_offsets.y_offset
+            self.probe_offset_z = 0.0
+        else:
+            probe_config = self.config.getsection('probe')
+            probe_offset_x = probe_config.getfloat('x_offset', default=0)
+            probe_offset_y = probe_config.getfloat('y_offset', default=0)
+            self.probe_offset_z = probe_config.getfloat('z_offset', default=0)
         
         self.bed_xy = list(self.config.getfloatlist("bed_xy", count=2, default=[191, 165]))
         self.pressure_nozzle_xy = list(self.config.getfloatlist("pressure_xy", count=2, default=[289, 361]))
@@ -67,7 +74,8 @@ class DZOS:
 
         print_data = read_data(PRINT_DATA_FILEPATH)
         if self.polynomial and print_data:
-            self.polynomial = True if len(print_data) > self.polynomial_sample_min else False                    
+            valid_print_data_count = self._check_valid_print_data(print_data)
+            self.polynomial = True if valid_print_data_count > self.polynomial_sample_min else False                    
 
         self.gcode.register_command("DZOS_Z_OFFSET", self.cmd_DZOS_Z_OFFSET)
         self.gcode.register_command("DZOS_Z_CALCULATE", self.cmd_DZOS_Z_CALCULATE)
@@ -75,6 +83,7 @@ class DZOS:
 
 
     def cmd_DZOS_Z_OFFSET(self, gcmd):
+        self.cmd_DZOS_Z_CALCULATE(gcmd)        
         self._init_printer_objects()
         cache_static = int(gcmd.get("CACHE_STATIC", 0))
         input_bed_type = str(gcmd.get("BEDTYPE", "None"))
@@ -133,12 +142,19 @@ class DZOS:
     def cmd_DZOS_Z_CALCULATE(self, gcmd):
         statistics = int(gcmd.get("STATISTICS", 0)) 
         self._init_printer_objects()
-        gcmd.respond_info("DZOS: Calc...")
-        self._display_msg("DZOS: Calc...")       
+        error = False
+        gcmd.respond_info("DZOS: Calculating Factors")
+        self._display_msg("DZOS: Calc")   
         print_data = read_data(PRINT_DATA_FILEPATH)
-        if not print_data:
-            gcmd.respond_info("DZOS: No Print Data Found!")
-            self._display_msg("DZOS: No Print!")
+        if print_data:
+            print_data_count = self._check_valid_print_data(print_data)
+            if print_data_count < 2:
+                error = True
+        else:
+            error = True
+        if error:
+            gcmd.respond_info("DZOS: Not Enough Data!")
+            self._display_msg("DZOS: Data!")
             return
         if self.polynomial:
             factor_dict = ml_polynomial_optimize(print_data, self.bed_type_dict, self.outlier_sample_min, self.outlier_deviation) 
@@ -191,7 +207,6 @@ class DZOS:
                 gcmd.respond_info(f"DZOS: Offset: {factor_dict['statistics']['offset']['mean']:.3f}")
             else:
                 self._set_z_offset(-self.probe_offset_z)
-                gcmd.respond_info("DZOS: Complete!")
         else:
             gcmd.respond_info("DZOS: Not Enough Data!")
             self._display_msg("DZOS: Data!")
@@ -294,7 +309,7 @@ class DZOS:
 
 
     def _calculate_dynamic_offset(self, gcmd, nozzle_temperature, bed_temperature, bed_type, polynomial):
-        self._display_msg("DZOS: Calc..")
+        self._display_msg("DZOS: Calc")
 
         initial_z = self._generic_z_probe(gcmd, self.probe_object, x=self.bed_xy[0], y=self.bed_xy[1])
         self._set_z_zero(initial_z)
@@ -316,6 +331,8 @@ class DZOS:
         elif self.sensor_name != 'none':
             sensor_status = self.printer.lookup_object(f'temperature_sensor {self.sensor_name}').get_status(event_time)
             sensor_temperature = sensor_status.get('temperature')
+        else:
+            sensor_temperature = 0.0
 
         if polynomial:
             z_offset = self._calculate_z_offset_polynomial(d_bed_z, nozzle_temperature, bed_temperature, bed_type, sensor_temperature)
@@ -367,7 +384,7 @@ class DZOS:
         gcmd.respond_info("DZOS: Soak Time: %is" % duration)
         while iteration < duration:
             remaining = duration - iteration
-            self._display_msg(f"DZOS:{int(remaining)}")
+            self._display_msg(f"DZOS: {int(remaining)}")
             if not nozzle_heater_enabled and remaining <= 120:
                 self._set_temperature(120, blocking=False, bed=False)
                 nozzle_heater_enabled = True
@@ -395,7 +412,7 @@ class DZOS:
         gcmd.respond_info("DZOS: Soak Time: %is" % duration)
         while iteration < duration:
             remaining = duration - iteration
-            self._display_msg(f"DZOS:{int(remaining)}")
+            self._display_msg(f"DZOS: {int(remaining)}")
             if not nozzle_heater_enabled and remaining <= 120:
                 self._set_temperature(120, blocking=False, bed=False) 
                 nozzle_heater_enabled = True
@@ -507,6 +524,15 @@ class DZOS:
         self.printer.lookup_object('probe').cmd_Z_OFFSET_APPLY_PROBE(gcmd_probe_save)
 
 
+    def _check_valid_print_data(self, print_data: dict) -> bool:
+        required_key = "z_offset"
+        count = 0
+        for print_data_entry in print_data: 
+            if required_key in print_data_entry:
+                count += 1
+        return count
+
+
     def _create_data_dict(self, 
             d_bed_z: float, 
             d_pressure_z: float,
@@ -591,7 +617,7 @@ class DZOS:
             event_time = self.printer.get_reactor().monotonic()
             status_dict = self.stats.get_status(event_time)
             state: str = status_dict["state"]
-            if state.lower() != "printing":
+            if state.lower() not in ["printing", "pause", "paused", "resume", "resuming", "resumed"]:
                 printing = False
                 gcmd.respond_info("DZOS: Print End!")
             else:
