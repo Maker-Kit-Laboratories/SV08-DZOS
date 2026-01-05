@@ -1,0 +1,9 @@
+title: DZOS 
+description: Dynamic Z Offset and Soak
+theme: just-the-docs
+color_scheme: dark
+logo: "./documentation/images/dzos_logo.png"
+url: https://github.com/Maker-Kit-Laboratories/SV08-DZOS
+
+aux_links:
+  Github Repository: https://github.com/Maker-Kit-Laboratories/SV08-DZOS
