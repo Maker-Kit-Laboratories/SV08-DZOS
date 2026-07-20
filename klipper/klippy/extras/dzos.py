@@ -1,7 +1,7 @@
 ######################################################################################################################################################################################################
 # DZOS: DYNAMIC Z OFFSET AND SOAK
 # AUTHOR: MAKER KIT LABORATORIES
-# VERSION: 0.5.01
+# VERSION: 0.5.02
 ######################################################################################################################################################################################################
 import json
 import os
@@ -206,7 +206,7 @@ class DZOS:
                     gcmd.respond_info(f"DZOS: Sensor Temperature²: {factor_dict['statistics']['sensor_temperature2']['mean']:.3f}")
                 gcmd.respond_info(f"DZOS: Offset: {factor_dict['statistics']['offset']['mean']:.3f}")
             else:
-                self._set_z_offset(-self.probe_offset_z)
+                self._set_z_offset(0.0)
         else:
             gcmd.respond_info("DZOS: Not Enough Data!")
             self._display_msg("DZOS: Data!")
@@ -344,7 +344,7 @@ class DZOS:
         gcmd.respond_info("DZOS: Z Offset: %.3f" % z_offset)
         self._display_msg(f"DZOS: {z_offset:.3f}")
         
-        self._set_z_offset(z_offset + self.probe_offset_z)
+        self._set_z_offset(z_offset + self.probe_offset_z, home=True)
 
     def _calculate_mesh_bounds(self, gcmd):
         exclude_objects = self.printer.lookup_object("exclude_object", None)
@@ -514,7 +514,9 @@ class DZOS:
         self.toolhead.manual_move([None, None, z], self.speed_z_hop)
 
 
-    def _set_z_offset(self, offset: float):
+    def _set_z_offset(self, offset: float, home: bool=False):
+        if home:
+            self._home_z()
         gcmd_offset = self.gcode.create_gcode_command("SET_GCODE_OFFSET", "SET_GCODE_OFFSET", {'Z': offset})
         self.gcode_move.cmd_SET_GCODE_OFFSET(gcmd_offset)
 
@@ -591,11 +593,9 @@ class DZOS:
             qgl.cmd_QUAD_GANTRY_LEVEL(gcmd_qgl)
 
 
-    def _home(self, axes: str="Z"):
-        gcmd_home = self.gcode.create_gcode_command("G28", "G28", {axes: None})
-        home = self.printer.lookup_object('homing_override')
-        home.cmd_G28(gcmd_home)
-
+    def _home_z(self):
+        self.gcode.run_script_from_command("G28 Z")
+        
 
     def _calculate_soak_factor(self, current_bed_temperature: int, target_bed_temperature: int) -> float:
         bed_temperature_difference = target_bed_temperature - current_bed_temperature

@@ -4,6 +4,12 @@ nav_order: 2
 layout: home
 ---
 
+# DZOS: Dynamic Z Offset and Soaking
+
+### 0.5.02
+- Fixed issue with stored z_offsets being calculated into the bed mesh.
+
+
 ### 0.5.01
 
 - Eddy improvements.

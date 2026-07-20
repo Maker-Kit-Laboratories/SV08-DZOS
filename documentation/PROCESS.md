@@ -36,7 +36,7 @@ layout: home
 
 1. Access the SV08 via SSH. ( `ssh sovol@<your sv08 ip>` )
 2. `cd SV08-DZOS`
-3. `chmod +x dzos_install.sh`
+3. `chmod +x dzos_remove.sh`
 4. `./dzos_remove.sh`
 5. Ensure your `printer.cfg` saved variables related to `[dzos]` are removed.
 6. Restart your entire printer.
