@@ -7,7 +7,7 @@ layout: home
 # DZOS: Dynamic Z Offset and Soaking
 
 ### 0.5.02
-- Fixed issue with stored z_offsets being calculated into the bed mesh.
+- Fixed issue with stored z_offset being calculated into the bed mesh fade.
 
 
 ### 0.5.01
